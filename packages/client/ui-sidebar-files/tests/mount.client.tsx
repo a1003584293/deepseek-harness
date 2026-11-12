@@ -6,7 +6,7 @@
  * measures reports a width the spec sets, because jsdom lays nothing out.
  */
 import { useSyncExternalStore } from 'react'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ReactNode } from 'react'
 import { render } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
@@ -94,6 +94,8 @@ export interface Mounted {
   readonly viewport: ReturnType<typeof measureRows>['viewport']
   /** Whether a navigator that can draw a tree has the face placed beside a tab's content. */
   readonly beside: (tabId: TabId) => boolean
+  /** The frame's file-dock side, which a spec may change and rerender. */
+  readonly editorSide: SnapshotStore<'left' | 'right'>
   /** Render again in place, after changing `placement` or `row`. */
   readonly rerender: () => void
   /** Render a fresh drawing over the same store and face, as a tab switch remounts it. */
@@ -106,6 +108,8 @@ function harness(placement: Placement, controller: AbortController, book: Worksp
   const script = scriptedList()
   const searches = scriptedSearch()
   const search = searches.search
+  /** The frame's file-dock side, which a spec may change and rerender. */
+  const editorSide = createSnapshotStore<'left' | 'right'>('right')
   // Whether some tab type opens files: one predicate per answer, as registrations change it.
   const listeners = new Set<() => void>()
   let check = (_address: string): boolean => true
@@ -125,7 +129,7 @@ function harness(placement: Placement, controller: AbortController, book: Worksp
   // The owner's count of drawings that placed the face beside each tab.
   const placed = new Map<TabId, number>()
   const navigation = createSnapshotStore({ address: placement.contentId, params: undefined, revision: 0 })
-  const face = filesFace(script.list, script.watch, canOpen, () => navigation, search, book)(SESSION, instance, (tabId) => {
+  const face = filesFace(script.list, script.watch, canOpen, () => navigation, search, book, editorSide)(SESSION, instance, (tabId) => {
     placed.set(tabId, (placed.get(tabId) ?? 0) + 1)
     return () => { placed.set(tabId, placed.get(tabId)! - 1) }
   })
@@ -174,13 +178,15 @@ function harness(placement: Placement, controller: AbortController, book: Worksp
     },
     useCanOpen: <S,>(sel: (check: (address: string) => boolean) => S) =>
       sel(useSyncExternalStore(listener => hooks.canOpen.subscribe(listener), () => hooks.canOpen.getSnapshot())),
+    useEditorSide: <S,>(sel: (side: 'left' | 'right') => S) =>
+      sel(useSyncExternalStore(listener => editorSide.subscribe(listener), () => editorSide.getSnapshot())),
     useSearchPreferences: (cwd: string) => {
       const source = keyedHooks.searchPreferences(cwd)
       return useSyncExternalStore(listener => source.subscribe(listener), () => source.getSnapshot())
     },
     t,
   }
-  return { instance, script, search, searches, book, face, controller, viewers, tabActions, onOpen, beside, shared }
+  return { instance, script, search, searches, book, face, controller, viewers, tabActions, onOpen, beside, shared, editorSide }
 }
 
 /**

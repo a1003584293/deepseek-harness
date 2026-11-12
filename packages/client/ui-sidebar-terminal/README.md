@@ -39,7 +39,7 @@ Terminals an Agent opens appear by themselves. While a Session's header is displ
 
 The terminal background, default text, cursor, and selection follow the DSH theme, including system preference and theme-token overrides. Theme changes preserve the running shell, output, and application OSC color overrides. Reset commands restore colors to the current DSH defaults. The screen uses the Settings terminal font size and places the Settings terminal font ahead of its built-in monospace stack; changing either keeps the shell and output, and a visible writable screen refits the Host grid to the new cell size. xterm adjusts text toward 4.5:1 contrast; the cursor keeps at least 3:1 contrast against its cell background, including Vim colorschemes.
 
-Selecting terminal text and right-clicking opens the shared menu with **Add to composer**; the selected text, with the terminal's current directory when known, becomes a pinned draft that the next ordinary prompt sends as a `<terminal_selection>` element. The model treats it as recorded output, not instructions. An empty selection keeps the native gesture.
+Selecting terminal text and right-clicking opens the shared menu with **Add terminal selection to composer**; the selected text, with the terminal's current directory when known, becomes a pinned draft that the next ordinary prompt sends as a `<terminal_selection>` element. The model treats it as recorded output, not instructions. An empty selection keeps the native gesture.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation

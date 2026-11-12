@@ -118,6 +118,16 @@
   --dsh-dockkit-strip-inline-start: 10px;
 }
 
+/* The frame may dock this column left of the conversation. With the navigation
+   sidebar collapsed the column reaches the window's left edge, where the
+   hiddenInset traffic lights and the shell's leading controls float over the
+   first pane's strip: clear the frame's published leading band, as a full-width
+   main panel does. An expanded sidebar keeps that band to the left of this
+   column, so only the collapsed state carries the inset. */
+:global([data-platform='darwin']) :global([data-editor-side='left'][data-sidebar-collapsed]) .panel[data-sidebar-right-panel='push'] :global([data-dockkit-host='dock'][data-dockkit-column='0']) {
+  --dsh-dockkit-strip-inline-start: var(--dsh-frame-leading-clearance);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .panel :global([data-dockkit-host='dock']),
   .panel :global([data-dockkit-empty]),
@@ -283,4 +293,42 @@
   .panel :global([data-dockkit-float][data-sidebar-right-flash]) {
     animation-timing-function: step-end;
   }
+}
+
+/* File dock on the left (the frame publishes data-editor-side): the panel
+   anchors to the column's left edge, and hidden docked items leave through
+   that edge instead of the frame's right edge. */
+:global([data-editor-side='left']) .panel {
+  right: auto;
+  left: 0;
+}
+
+:global([data-editor-side='left']) .panel :global([data-dockkit-host='dock']),
+:global([data-editor-side='left']) .panel :global([data-dockkit-empty]),
+:global([data-editor-side='left']) .panel :global([data-dockkit-divider]) {
+  transform: translateX(calc(-1 * var(--dsh-sidebar-width)));
+}
+
+:global([data-editor-side='left']) .panel[data-sidebar-right-open] :global([data-dockkit-host='dock']),
+:global([data-editor-side='left']) .panel[data-sidebar-right-open] :global([data-dockkit-empty]),
+:global([data-editor-side='left']) .panel[data-sidebar-right-open] :global([data-dockkit-divider]) {
+  transform: none;
+}
+
+@starting-style {
+  :global([data-editor-side='left']) .panel[data-sidebar-right-opening] :global([data-dockkit-host='dock']),
+  :global([data-editor-side='left']) .panel[data-sidebar-right-opening] :global([data-dockkit-empty]),
+  :global([data-editor-side='left']) .panel[data-sidebar-right-opening] :global([data-dockkit-divider]) {
+    transform: translateX(calc(-1 * var(--dsh-sidebar-width)));
+  }
+}
+
+/* Anchored to the column's right edge in the shipped layout, a 100vw
+   fullscreen panel covers the frame; on the left the panel pins to the
+   viewport instead, so its overlay still spans the whole window. */
+:global([data-editor-side='left']) .panel[data-sidebar-right-panel='fullscreen'] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  z-index: 40;
 }

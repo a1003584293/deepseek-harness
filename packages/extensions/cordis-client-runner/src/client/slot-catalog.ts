@@ -2703,7 +2703,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'main\', () => ctx.slots.register(\n      { name: \'main\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:75',
+    source: 'packages/client/ui-layout/src/client/index.ts:76',
   },
   {
     key: 'main.conversation',
@@ -3233,7 +3233,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'rightbar\', () => ctx.slots.register(\n      { name: \'rightbar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:89',
+    source: 'packages/client/ui-layout/src/client/index.ts:90',
   },
   {
     key: 'rightbar.session',
@@ -3456,6 +3456,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-conversation EnterBehaviorRow id \'composer-enter\'',
       'client-ui-permission-presets PermissionRow id \'permission\'',
       'client-ui-settings-general DeveloperToolsRow id \'developer-tools\'',
+      'client-ui-settings-general EditorSideRow id \'editor-side\'',
       'client-ui-settings-general CurrentVersionRow id \'current-version\'',
       'client-ui-settings-general DesktopChannelRow id \'desktop-update-channel\'',
       'client-ui-settings-session-log UploadRow',
@@ -3972,7 +3973,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.bottom\', () => ctx.slots.register(\n      { name: \'shell.bottom\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:96',
+    source: 'packages/client/ui-layout/src/client/index.ts:97',
   },
   {
     key: 'shell.leading',
@@ -4004,7 +4005,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.leading\', () => ctx.slots.register(\n      { name: \'shell.leading\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:121',
+    source: 'packages/client/ui-layout/src/client/index.ts:122',
   },
   {
     key: 'shell.overlay',
@@ -4064,6 +4065,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-settings-general HostReleasePrompt id \'host-release-change\'',
       'client-ui-settings-session-log UploadToast id \'session-log-upload-toast\'',
       'client-ui-shortcuts ShortcutReference id \'shortcuts\'',
+      'client-ui-sidebar-files QuickOpen id \'files.quick-open\'',
       'client-ui-workspace SessionRenameDialog id \'workspace.session-rename\'',
       'client-ui-workspace SessionArchiveConfirmDialog id \'workspace.session-archive\'',
       'client-ui-workspace SessionDeleteConfirmDialog id \'workspace.session-delete\'',
@@ -4075,7 +4077,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.overlay\', () => ctx.slots.register(\n      { name: \'shell.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:107',
+    source: 'packages/client/ui-layout/src/client/index.ts:108',
   },
   {
     key: 'shell.quota-notice',
@@ -4152,7 +4154,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar\', () => ctx.slots.register(\n      { name: \'sidebar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:70',
+    source: 'packages/client/ui-layout/src/client/index.ts:71',
   },
   {
     key: 'sidebar.brand.mark',
@@ -4884,7 +4886,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.right.tab.files.actions\', () => ctx.slots.register(\n      { name: \'sidebar.right.tab.files.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar-files/src/client/index.ts:46',
+    source: 'packages/client/ui-sidebar-files/src/client/index.ts:50',
   },
   {
     key: 'sidebar.right.tab.guide',

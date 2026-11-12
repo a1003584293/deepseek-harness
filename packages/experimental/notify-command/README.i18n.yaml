@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/notify-command/README.md
+/:
+  en: 7518cfd97e1a83fe
+  zh: 2117d60938c72e42
+/deepseek-ai-dsh-notify-command:
+  en: 013f647f337974c5
+  zh: ab0e29c5fec70b83
+/deepseek-ai-dsh-notify-command/summary:
+  en: ca2ea3bd7307224d
+  zh: 239e9072fb2fd9cf
+/deepseek-ai-dsh-notify-command/table-of-contents:
+  en: 710ec8df74806640
+  zh: 06bbd14d65963e35
+/deepseek-ai-dsh-notify-command/use-this-package:
+  en: e6f5c3222ae776f9
+  zh: c6a68cfef6dc5152
+/deepseek-ai-dsh-notify-command/model-experience:
+  en: 83f497a1c472c8f8
+  zh: 83f497a1c472c8f8
+/deepseek-ai-dsh-notify-command/model-experience/kv-cache-effect:
+  en: a5220b4162a9841a
+  zh: a5220b4162a9841a
+/deepseek-ai-dsh-notify-command/known-limitations-and-deferred-work:
+  en: 21b3f749a779ebd7
+  zh: 821d84b13c4cd602
+/deepseek-ai-dsh-notify-command/known-limitations-and-deferred-work/dev-note:
+  en: 122cce84273c124a
+  zh: 6909b6437a0425eb

@@ -177,6 +177,19 @@ describe('right panel', () => {
     expect(store.getSnapshot().layoutInfo.rightbar).toBe(1100)
   })
 
+  it('keeps the dock\'s share of the frame when a left-docked frame resizes', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1000)
+    actions.openRightbar(true, false)
+    expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
+    // The left dock scales with the frame, leaving the conversation its share.
+    actions.setViewportWidth(1500, true)
+    expect(store.getSnapshot().layoutInfo.rightbar).toBe(675)
+    // A right-docked frame keeps the px preference and the centre absorbs the change.
+    actions.setViewportWidth(2000)
+    expect(store.getSnapshot().layoutInfo.rightbar).toBe(675)
+  })
+
   it('clamps drag preferences to 300px and 70% of the current frame', () => {
     const { store, actions } = createLayoutStore().create()
     actions.setViewportWidth(1600)

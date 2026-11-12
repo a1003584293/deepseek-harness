@@ -60,7 +60,12 @@ type LayoutActions = {
   retainMainPanels: (draft: LayoutState, panelIds: readonly string[]) => void
   setSidebar: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
-  setViewportWidth: (draft: LayoutState, width: number) => void
+  /**
+   * @param scaleRightbar - keep the right column's share of the frame: true
+   *   while the file dock sits left of the conversation, where the conversation
+   *   is the flexible column and must not absorb every window size change.
+   */
+  setViewportWidth: (draft: LayoutState, width: number, scaleRightbar?: boolean) => void
   setRightbar: (draft: LayoutState, px: number) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
@@ -113,12 +118,23 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
-      setViewportWidth: (d, width: number) => {
-        if (d.layoutInfo.viewportWidth === width) return
+      setViewportWidth: (d, width: number, scaleRightbar = false) => {
+        const previous = d.layoutInfo.viewportWidth
+        if (previous === width) return
         d.layoutInfo.rightbarInstant = false
-        if ((d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) !== (width < SIDEBAR_AUTO_COLLAPSE)
-          || (d.layoutInfo.viewportWidth < SIDEBAR_DRAWER_BREAKPOINT) !== (width < SIDEBAR_DRAWER_BREAKPOINT)) {
+        if ((previous < SIDEBAR_AUTO_COLLAPSE) !== (width < SIDEBAR_AUTO_COLLAPSE)
+          || (previous < SIDEBAR_DRAWER_BREAKPOINT) !== (width < SIDEBAR_DRAWER_BREAKPOINT)) {
           d.layoutInfo.narrowExpanded = false
+        }
+        // The dock keeps the fraction of the frame it had before the resize;
+        // the conversation, the remaining flexible column, scales with it
+        // instead of taking the whole delta.
+        if (scaleRightbar && d.layoutInfo.rightbar !== null && previous > 0) {
+          d.layoutInfo.rightbar = clampWidth(
+            d.layoutInfo.rightbar * width / previous,
+            RIGHTBAR_MIN,
+            Math.max(RIGHTBAR_MIN, width * RIGHTBAR_MAX_RATIO),
+          )
         }
         d.layoutInfo.viewportWidth = width
       },

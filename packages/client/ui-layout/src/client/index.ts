@@ -16,6 +16,7 @@ import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-clie
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import type { AppFrameInjected } from './AppFrame.tsx'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -160,6 +161,9 @@ export const inject = ['slots', 'theme', 'locale', 'shortcuts']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  // The file dock's side is a user preference, not geometry: it survives
+  // reloads per profile and is changed from the Settings row or ctx.layout.
+  const editorSide = createSnapshotStore<'left' | 'right'>('right', { persist: { name: 'layout.editorSide' } })
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh, en, ja, es, fr, de, ru, pt }), 'layout: command labels')
   const t = ctx.locale.bind('shortcuts.layout')
 
@@ -186,7 +190,7 @@ export function apply(ctx: ClientContext): void {
       subscribe: listener => instance.subscribe(listener),
     }
     const layout = new LayoutController(instance.actions, id =>
-      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo)
+      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo, editorSide)
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRegistration = ctx.slots.register({
@@ -201,7 +205,7 @@ export function apply(ctx: ClientContext): void {
         'shell.leading': { kind: 'single', scope: 'root' },
       },
       store,
-      inject: (): AppFrameInjected => ({ hooks: { foldedLandscape } }),
+      inject: (): AppFrameInjected => ({ hooks: { foldedLandscape, editorSide } }),
     }, AppFrame)
     const disposeShortcut = ctx.shortcuts.register({
       id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => t('toggle'), aliases: ['sidebar', 'toggle left sidebar'],

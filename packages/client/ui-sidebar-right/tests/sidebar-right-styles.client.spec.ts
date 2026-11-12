@@ -13,6 +13,14 @@ describe('SidebarRight.module.css', () => {
       + String.raw`\s*transform: translateX\(var\(--dsh-sidebar-width\)\);\s*}\s*}`))
   })
 
+  it('clears the traffic lights and leading controls when a left-docked panel reaches the window edge', () => {
+    expect(css).toMatch(new RegExp(String.raw`:global\(\[data-platform='darwin'\]\)\s*`
+      + String.raw`:global\(\[data-editor-side='left'\]\[data-sidebar-collapsed\]\)\s*`
+      + String.raw`\.panel\[data-sidebar-right-panel='push'\]\s*`
+      + String.raw`:global\(\[data-dockkit-host='dock'\]\[data-dockkit-column='0'\]\)\s*\{\s*`
+      + String.raw`--dsh-dockkit-strip-inline-start: var\(--dsh-frame-leading-clearance\);\s*}`))
+  })
+
   it('removes the open slide as well as the close slide for reduced motion', () => {
     expect(css).toMatch(new RegExp(String.raw`@media \(prefers-reduced-motion: reduce\)\s*\{[^{}]*`
       + String.raw`\.panel\[data-sidebar-right-open\] ${host}[^{}]*\{\s*transition: none;\s*}`))

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The navigator beside a file preview: hidden until the pane asks for it, one
+ * The navigator beside a file preview: shown by default, one
  * tree per pane that a remount or a hide finds as it was, a listing that lives
  * only while the tree is drawn, the current file located, clicks that open or
  * reveal tabs, keyboard focus carried to the pane's next drawing of the tree,
@@ -38,9 +38,8 @@ afterEach(() => {
   Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
 })
 
-/** Show the navigator and answer the root and `src` listings, as revealing `src/…` asks for them. */
+/** Answer the root and `src` listings a shown navigator starts, as revealing `src/…` asks for them. */
 async function revealSrc(h: Mounted): Promise<void> {
-  act(() => { fireEvent.click(h.view.getByRole('button', { name: zh['navigator.show'] })) })
   await act(() => h.script.watches.ready(ROOT))
   await act(() => h.script.settle({ ok: true, value: ROOT_LEVEL }))
   await act(() => h.script.watches.ready(`${ROOT}/src`))
@@ -58,17 +57,17 @@ function focusedPath(): string | null | undefined {
 }
 
 describe('FileNavigator beside a preview', () => {
-  it('stays hidden and lists nothing until the toggle shows it', async () => {
+  it('opens the pane\'s first preview with the tree shown, and hides it on the toggle', async () => {
     const h = mountNavigator(A)
-    expect(h.view.container.querySelector('[data-files-navigator]')).toBeNull()
-    const toggle = h.view.getByRole('button', { name: zh['navigator.show'] })
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(h.script.watches.opened).toEqual([])
-    act(() => { fireEvent.click(toggle) })
+    const toggle = h.view.getByRole('button', { name: zh['navigator.hide'] })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(h.instance.getSnapshot().byPane[PANE]?.open).toBe(true)
-    expect(h.view.getByRole('button', { name: zh['navigator.hide'] }).getAttribute('aria-expanded')).toBe('true')
     await act(() => h.script.watches.ready(ROOT))
     expect(h.view.container.querySelector('[data-files-navigator]')).not.toBeNull()
+    act(() => { fireEvent.click(toggle) })
+    expect(h.instance.getSnapshot().byPane[PANE]?.open).toBe(false)
+    expect(h.view.getByRole('button', { name: zh['navigator.show'] }).getAttribute('aria-expanded')).toBe('false')
+    expect(h.view.container.querySelector('[data-files-navigator]')).toBeNull()
   })
 
   it('reveals the previewed file once, marks its row, and scrolls it into view', async () => {
@@ -222,7 +221,6 @@ describe('FileNavigator beside a preview', () => {
     Element.prototype.scrollIntoView = scrolled
     const outside = sessionFileAddress(SESSION, '/elsewhere/a.ts')
     const h = mountNavigator(outside)
-    act(() => { fireEvent.click(h.view.getByRole('button', { name: zh['navigator.show'] })) })
     await act(() => h.script.watches.ready(ROOT))
     await act(() => h.script.settle({ ok: true, value: ROOT_LEVEL }))
     expect(h.view.container.querySelector('[aria-current]')).toBeNull()
@@ -266,13 +264,13 @@ describe('FileNavigator beside a preview', () => {
 
   it('fills a narrow row without the resize edge, and uses an overlay at 400px', async () => {
     const h = mountNavigator(A)
-    h.row.width = 399
+    h.row.report(399)
     await revealSrc(h)
     const aside = (): HTMLElement | null => h.view.container.querySelector<HTMLElement>('[data-files-navigator]')
     expect(aside()?.getAttribute('data-files-navigator-mode')).toBe('fill')
     expect(h.view.queryByRole('separator')).toBeNull()
     act(() => { fireEvent.click(h.view.getByRole('button', { name: zh['navigator.hide'] })) })
-    h.row.width = 400
+    h.row.report(400)
     act(() => { fireEvent.click(h.view.getByRole('button', { name: zh['navigator.show'] })) })
     expect(aside()?.getAttribute('data-files-navigator-mode')).toBe('overlay')
     expect(h.view.getByRole('separator', { name: zh['navigator.resize'] })).not.toBeNull()
@@ -463,6 +461,8 @@ describe('FileNavigator beside a preview', () => {
 
   it.each(['show', 'shortcut'] as const)('hands body focus to the tree once on its first narrow drawing through %s', async (source) => {
     const h = mountNavigator(A)
+    // Start hidden so the shown drawing is the first one at the narrow width.
+    act(() => { h.instance.actions.shown(PANE, false) })
     h.row.width = 399
     const row = h.view.container.querySelector<HTMLElement>('[data-test-row]')!
     const button = document.createElement('button')
@@ -591,6 +591,29 @@ describe('FileNavigator beside a preview', () => {
     expect(release).toHaveBeenCalledWith(1)
     fireEvent(edge, new Event('lostpointercapture', { bubbles: true }))
     expect(h.view.container.querySelector('[data-files-navigator]')?.className).not.toMatch(/dragging/)
+  })
+
+  it('marks the frame\'s left side and mirrors its resize edge, so dragging outward still widens the tree', async () => {
+    const h = mountNavigator(A)
+    act(() => { h.instance.actions.shown(PANE, true) })
+    await act(() => h.script.watches.ready(ROOT))
+    const navigator = (): HTMLElement => h.view.container.querySelector<HTMLElement>('[data-files-navigator]')!
+    expect(navigator().getAttribute('data-files-navigator-side')).toBe('right')
+    act(() => { h.editorSide.set('left') })
+    expect(navigator().getAttribute('data-files-navigator-side')).toBe('left')
+    const width = (): number | undefined => h.instance.getSnapshot().byPane[PANE]?.width
+    const edge = h.view.getByRole('separator', { name: zh['navigator.resize'] })
+    // The edge now faces right: ← narrows the tree and → widens it.
+    fireEvent.keyDown(edge, { key: 'ArrowLeft' })
+    expect(width()).toBe(DEFAULT_NAVIGATOR_WIDTH - 20)
+    fireEvent.keyDown(edge, { key: 'ArrowRight' })
+    expect(width()).toBe(DEFAULT_NAVIGATOR_WIDTH)
+    edge.setPointerCapture = vi.fn()
+    edge.releasePointerCapture = vi.fn()
+    fireEvent.pointerDown(edge, { clientX: 500, pointerId: 1, button: 0 })
+    fireEvent.pointerMove(edge, { clientX: 540 })
+    expect(width()).toBe(DEFAULT_NAVIGATOR_WIDTH + 40)
+    fireEvent.pointerUp(edge, { pointerId: 1 })
   })
 
   it('carries the tree\'s keyboard focus to the pane\'s next drawing of it in the same task only', async () => {

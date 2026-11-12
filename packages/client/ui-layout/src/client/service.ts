@@ -9,6 +9,7 @@
  * store's declared action set, shared with the root registration.
  */
 import type { BoundActions, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { createLayoutStore } from './stores.ts'
 
@@ -51,6 +52,17 @@ export interface ILayout {
   openRightbar(track: boolean, fullscreen: boolean): void
   /** Report the right panel as hidden: no track, no handle. */
   closeRightbar(): void
+  /**
+   * Which side of the conversation the file dock occupies. The left side puts
+   * it between the navigation sidebar and the conversation, like an editor's
+   * file tree; the right side is the shipped default.
+   */
+  readonly editorSide: HostObservable<'left' | 'right'>
+  /**
+   * Place the file dock on one side of the conversation from now on.
+   * @param side - the side to use; persisted for this profile.
+   */
+  setEditorSide(side: 'left' | 'right'): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -66,7 +78,13 @@ export class LayoutController implements ILayout {
     private readonly panels: PanelActions,
     private readonly hasMainPanel: (id: MainPanelId) => boolean,
     readonly panelInfo: HostObservable<PanelInfo>,
+    readonly editorSide: SnapshotStore<'left' | 'right'>,
   ) {}
+
+  /** Place the file dock on one side of the conversation. */
+  setEditorSide(side: 'left' | 'right'): void {
+    this.editorSide.set(side)
+  }
 
   /** Select a global panel or return to the Conversation. */
   selectPanel(panelId: MainPanelId | null): void {

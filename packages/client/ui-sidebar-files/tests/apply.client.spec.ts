@@ -20,6 +20,8 @@ import type { FilesInjected } from '../src/client/face.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
 import { FileTree } from '../src/client/FileTree.tsx'
+import { QuickOpen } from '../src/client/QuickOpen.tsx'
+import type { QuickOpenInjected } from '../src/client/QuickOpen.tsx'
 import { FileNavigator } from '../src/client/FileNavigator.tsx'
 import { FilesBody } from '../src/client/FilesBody.tsx'
 import { FilesTitle } from '../src/client/FilesTitle.tsx'
@@ -67,22 +69,27 @@ async function boot() {
       return () => { dictionaries.delete(ns) }
     }),
   }
-  const workspaceFiles = { list: vi.fn() }
+  const workspaceFiles = { list: vi.fn(), search: vi.fn(), stat: vi.fn() }
   const navigation = createSnapshotStore({ address: 'sidebar://files', params: undefined, revision: 0 })
   const source = {
     getSnapshot: () => navigation.getSnapshot(),
     subscribe: vi.fn((listener: () => void) => vi.fn(navigation.subscribe(listener))),
   }
+  const openTabs = createSnapshotStore<readonly { sessionId: SessionId; tabId: string; kind: string; contentId: string }[]>([])
+  const mounted = createSnapshotStore<SessionId | undefined>(undefined)
   const sidebar = {
     tabDomain: { occurrence: vi.fn(() => ({ navigation: source })) },
     commandTarget: vi.fn(), openTabFromTarget: vi.fn(),
     isExpanded: vi.fn(() => true), toggleExpanded: vi.fn(),
+    openTabs, mounted, active: vi.fn(() => undefined), close: vi.fn(), openResource: vi.fn(),
   }
   const commands: ShortcutCommand[] = []
   ctx.provide('shortcuts', { register: (command: ShortcutCommand) => {
     commands.push(command)
     return () => { commands.splice(commands.indexOf(command), 1) }
   } } as never)
+  // The frame's file-dock side reaches the navigator through the layout service.
+  ctx.provide('layout', { editorSide: createSnapshotStore<'left' | 'right'>('right') } as never)
   ctx.provide('sidebarRight', sidebar as never)
   ctx.provide('sidebarRightTabs', tabs as never)
   ctx.provide('slots', slots as never)
@@ -91,7 +98,7 @@ async function boot() {
   ctx.provide('remote.workspaceFiles', workspaceFiles as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { ctx, tabs, registered, dictionaries, fiber, sidebar, commands, slots, navigation, source }
+  return { ctx, tabs, registered, dictionaries, fiber, sidebar, commands, slots, navigation, source, workspaceFiles }
 }
 
 /** Run the files command for one target. */
@@ -114,6 +121,19 @@ describe('ui-sidebar-files apply', () => {
       expect(h.sidebar.openTabFromTarget).toHaveBeenCalledWith('files', target)
     } finally { await h.fiber.dispose() }
     expect(h.commands).toEqual([])
+  })
+
+  it('closes the files page when it is already the active tab', async () => {
+    const h = await boot()
+    try {
+      h.sidebar.commandTarget.mockReturnValue({ sessionId: SESSION, paneId: PANE, host: 'dock', tabId: 'files-page' })
+      h.sidebar.active.mockReturnValue({ id: 'files-page', kind: 'files', contentId: 'sidebar://files', title: '文件' } as never)
+      const result = h.commands[0]!.resolve({ region: 'page', modal: null, target: null })
+      if (result.status !== 'handled') throw new Error('Expected files command to be available')
+      result.run()
+      expect(h.sidebar.close).toHaveBeenCalledWith('files-page')
+      expect(h.sidebar.openTabFromTarget).not.toHaveBeenCalled()
+    } finally { await h.fiber.dispose() }
   })
 
   it('shows and focuses the tree of the docked tab the face is placed beside, and elsewhere opens the page, whose tree always shows', async () => {
@@ -139,9 +159,15 @@ describe('ui-sidebar-files apply', () => {
       expect(instance.getSnapshot().byPane[PANE]?.open).toBe(true)
 
       h.sidebar.isExpanded.mockReturnValue(true)
+      // The navigator is already shown: the same shortcut hides it instead.
       run(h, { sessionId: SESSION, paneId: PANE, host: 'dock', tabId: 'tab-1' })
       expect(h.sidebar.toggleExpanded).toHaveBeenCalledTimes(1)
+      expect(focus).toHaveBeenCalledTimes(1)
+      expect(instance.getSnapshot().byPane[PANE]?.open).toBe(false)
+
+      run(h, { sessionId: SESSION, paneId: PANE, host: 'dock', tabId: 'tab-1' })
       expect(focus).toHaveBeenCalledTimes(2)
+      expect(instance.getSnapshot().byPane[PANE]?.open).toBe(true)
 
       // A tab without the navigator beside it, the page itself, a floating tab, or another Session goes through the page open,
       // which writes no shown choice: the page's tree always shows.
@@ -173,6 +199,10 @@ describe('ui-sidebar-files apply', () => {
       const sibling = face.placeBeside('tab-2' as TabId)
       loading()
       loading()
+      // The pane's first drawing starts with the tree shown, so the command
+      // hides it; the next press shows it again and takes the keyboard.
+      run(h, target)
+      expect(instance.getSnapshot().byPane[PANE]?.open).toBe(false)
       run(h, target)
       expect(focus).toHaveBeenCalledTimes(1)
       // Once the last placement goes, the command opens the page.
@@ -190,6 +220,8 @@ describe('ui-sidebar-files apply', () => {
       const nextFocus = vi.spyOn(nextFace, 'focus')
       nextFace.attach(PANE, 'tab-1' as TabId, new AbortController().signal)
       nextFace.placeBeside('tab-1' as TabId)
+      // Hide the pane so this press focuses instead of toggling the default-shown tree.
+      next.actions.shown(PANE, false)
       older()
       run(h, target)
       expect(nextFocus).toHaveBeenCalledWith(PANE)
@@ -256,12 +288,13 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.files.navigator.toggle', undefined, 'sidebarFiles'],
       ['sidebar.right.pane.tab', FILES_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', FILES_ID, undefined],
+      ['shell.overlay', undefined, 'sidebarFiles'],
     ])
     expect(slots.registerFactory.mock.calls.map(([options]) => [options.name, options.scope]))
       .toEqual([['sidebar.files.tree', 'root'], ['sidebar.files.navigator', 'session'], ['sidebar.files.navigator.toggle', 'session']])
-    const [tree, factory, toggle, body, title] = registered
-    expect([factory?.component, toggle?.component, body?.component, title?.component])
-      .toEqual([FileNavigator, NavigatorToggle, FilesBody, FilesTitle])
+    const [tree, factory, toggle, body, title, palette] = registered
+    expect([factory?.component, toggle?.component, body?.component, title?.component, palette?.component])
+      .toEqual([FileNavigator, NavigatorToggle, FilesBody, FilesTitle, QuickOpen])
     expect(tree?.component).toBe(FileTree)
     expect(slots.registerFactory.mock.calls[0]?.[0]).toMatchObject({ slots: { accessory: { scope: 'root' } } })
     // One store handle for the Factory, the toggle and the page.
@@ -282,6 +315,56 @@ describe('ui-sidebar-files apply', () => {
   })
 })
 
+
+it('opens the quick palette from its shortcut and closes it on a second press', async () => {
+  const h = await boot()
+  onTestFinished(async () => { await h.fiber.dispose() })
+  const quick = h.commands.find(command => command.id === 'workspace.quickOpen')!
+  expect(quick.defaults?.['web:macos']).toEqual({ code: 'KeyP', modifiers: ['primary', 'alt'] })
+  expect(quick.defaults?.['desktop:macos']).toEqual({ code: 'KeyP', modifiers: ['primary'] })
+  // No Session on screen: the command refuses instead of opening an empty palette.
+  expect(quick.resolve({ region: 'page', modal: null, target: null })).toMatchObject({ status: 'blocked', reason: 'shortcut.noSession' })
+  h.sidebar.mounted.set(SESSION)
+  const handled = quick.resolve({ region: 'page', modal: null, target: null }) as { status: 'handled'; run: () => void }
+  expect(handled.status).toBe('handled')
+  const overlay = h.registered.find(entry => entry.name === 'shell.overlay')!
+  const injected = overlay.inject!(SESSION, {}) as QuickOpenInjected
+  expect(injected.hooks.open.getSnapshot()).toBeNull()
+  handled.run()
+  expect(injected.hooks.open.getSnapshot()).toBe(1)
+  handled.run()
+  expect(injected.hooks.open.getSnapshot()).toBeNull()
+  // Opening a row addresses the file through the normal resource routing.
+  injected.openFile('src/index.ts')
+  expect(h.sidebar.openResource).toHaveBeenCalledWith('dsh-resource://file/session/files-session/src/index.ts')
+  // The Host answer lists files only; a failed search settles as no rows.
+  h.workspaceFiles.search.mockResolvedValueOnce({
+    ok: true,
+    value: { matches: [{ path: 'src/index.ts', type: 'file' }, { path: 'src', type: 'directory' }], truncated: false, incomplete: false },
+  })
+  const rows = await injected.search('in', new AbortController().signal)
+  expect(rows).toEqual([{ path: 'src/index.ts', name: 'index.ts', directory: 'src/' }])
+  h.workspaceFiles.search.mockResolvedValueOnce({ ok: false, error: { code: 'x', message: 'no' } })
+  expect(await injected.search('x', new AbortController().signal)).toEqual([])
+  h.workspaceFiles.search.mockRejectedValueOnce(new Error('offline'))
+  expect(await injected.search('x', new AbortController().signal)).toEqual([])
+  // An absolute path is probed as one file: shown only when stat finds it, and
+  // never turned into a workspace name search.
+  const searchCalls = h.workspaceFiles.search.mock.calls.length
+  const signal = new AbortController().signal
+  h.workspaceFiles.stat.mockResolvedValueOnce({ ok: true, value: { absolutePath: '/tmp/x/abs.py', version: 'v' } })
+  expect(await injected.search('/tmp/x/abs.py', signal)).toEqual([
+    { path: '/tmp/x/abs.py', name: 'abs.py', directory: '/tmp/x/' },
+  ])
+  expect(h.workspaceFiles.stat).toHaveBeenLastCalledWith(SESSION, '/tmp/x/abs.py', signal)
+  h.workspaceFiles.stat.mockResolvedValueOnce({ ok: true, value: { absolutePath: 'C:/w/x.py', version: 'v' } })
+  expect(await injected.search('C:\\w\\x.py', signal)).toEqual([{ path: 'C:/w/x.py', name: 'x.py', directory: 'C:/w/' }])
+  h.workspaceFiles.stat.mockResolvedValueOnce({ ok: false, error: { code: 'workspace-file/not-found', message: 'no', details: { path: '/tmp/x/gone.py' } } })
+  expect(await injected.search('/tmp/x/gone.py', signal)).toEqual([])
+  h.workspaceFiles.stat.mockRejectedValueOnce(new Error('offline'))
+  expect(await injected.search('/tmp/x/offline.py', signal)).toEqual([])
+  expect(h.workspaceFiles.search.mock.calls.length).toBe(searchCalls)
+})
 
 it('carries the file tree path and pane into its menu gesture', async () => {
   const h = await boot()

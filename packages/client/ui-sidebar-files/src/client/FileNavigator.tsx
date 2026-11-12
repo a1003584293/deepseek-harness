@@ -166,7 +166,7 @@ function SearchFailure({ failure, onRetry, t }: {
  * @returns the navigator, or nothing while hidden or without a workspace.
  */
 export function FileNavigator({
-  useTabInfo, page, onOpen, sessionId, useSessions, useStore, actions, useRowWidth, useCanOpen, useSearchPreferences,
+  useTabInfo, page, onOpen, sessionId, useSessions, useStore, actions, useRowWidth, useCanOpen, useSearchPreferences, useEditorSide,
   attach, placeBeside, hold, toggle, scrolled, bodyDrawn, currentDrawn, navigatorDrawn,
   setQuery, toggleSearch, retrySearch, setSearchPreferences, searchDrawn, t, renderFactorySlot, useContextMenu,
 }: FactoryComponentPropsOf<'sidebar.files.navigator'>): ReactNode {
@@ -179,6 +179,9 @@ export function FileNavigator({
   const state = useStore(store => store.byPane[paneId])
   const rowWidth = useRowWidth(paneId)
   const canOpen = useCanOpen(check => check)
+  // The frame's file-dock side: on the left the navigator precedes the pane's
+  // content, so its resize edge and drag direction mirror the shipped side.
+  const editorOnLeft = useEditorSide(side => side === 'left')
   const open = page || state?.open === true
   // Measured by the face; the viewport rule is CSS's, read again when a file opens.
   const mode = navigatorMode(rowWidth)
@@ -291,6 +294,7 @@ export function FileNavigator({
       aria-label={t('guide.title')}
       data-files-navigator={paneId}
       data-files-navigator-mode={shown}
+      data-files-navigator-side={editorOnLeft ? 'left' : 'right'}
       data-files-state="tree"
       data-files-root={cwd}
       onKeyDown={(event) => {
@@ -315,8 +319,9 @@ export function FileNavigator({
           tabIndex={0}
           data-files-navigator-resize
           onKeyDown={(event) => {
-            const next = event.key === 'ArrowLeft' ? geometry.width + RESIZE_STEP
-              : event.key === 'ArrowRight' ? geometry.width - RESIZE_STEP
+            // Arrows move the edge, so the width change follows the side the edge is on.
+            const next = event.key === 'ArrowLeft' ? geometry.width + (editorOnLeft ? -RESIZE_STEP : RESIZE_STEP)
+              : event.key === 'ArrowRight' ? geometry.width + (editorOnLeft ? RESIZE_STEP : -RESIZE_STEP)
                 : event.key === 'Home' ? geometry.minimum
                   : event.key === 'End' ? geometry.maximum
                     : undefined
@@ -335,7 +340,8 @@ export function FileNavigator({
           onPointerMove={(event) => {
             const origin = drag.current
             if (origin === undefined) return
-            actions.resized(paneId, clamp(origin.width + origin.x - event.clientX))
+            // Dragging the edge outward widens the navigator on either side.
+            actions.resized(paneId, clamp(origin.width + (editorOnLeft ? event.clientX - origin.x : origin.x - event.clientX)))
           }}
           onPointerUp={(event) => {
             event.currentTarget.releasePointerCapture(event.pointerId)

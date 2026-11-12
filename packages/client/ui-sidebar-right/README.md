@@ -133,7 +133,7 @@ The guide tab is a muted compass over one entry capsule per `guide` entry the re
 
 Every string in the column comes from the `sidebarRight` locale namespace, including the kit's accessible names. A tab's title is fixed when the tab is minted; a type's display name follows the current language.
 
-Tab context menus capture the Session and clicked pane. Close, close others, and close right use existing close handlers; batch candidates stay inside that pane and a moved or removed anchor invalidates the operation. Existing `sidebar.right.tab.menu.item` contributions remain under the captured Session scope. [ui-context-menu](../ui-context-menu/README.md) owns the shared popup.
+The frame may place this column left of the conversation (`data-editor-side='left'`); the panel then anchors to the column's left edge, slides in from that edge, and its fullscreen presentation pins to the viewport. Tab context menus capture the Session and clicked pane. Close, close others, and close right use existing close handlers; batch candidates stay inside that pane and a moved or removed anchor invalidates the operation. A file tab adds two copy rows: **Copy file name** writes the leaf name without its final extension, and **Copy file name with extension** keeps it. Existing `sidebar.right.tab.menu.item` contributions remain under the captured Session scope. [ui-context-menu](../ui-context-menu/README.md) owns the shared popup.
 
 <a id="model-experience"></a>
 ## Model Experience

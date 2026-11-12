@@ -36,6 +36,7 @@ let animationFrames: Map<number, FrameRequestCallback>
 let nextFrame: number
 let originalTitle: string
 let foldedLandscape: SnapshotStore<boolean>
+let editorSide: SnapshotStore<'left' | 'right'>
 const restoreProperties: (() => void)[] = []
 
 function replaceProperty<T extends object, K extends keyof T>(target: T, key: K, value: T[K]): void {
@@ -99,6 +100,7 @@ function mountFrame(windowWidth = frameWidth, content?: AppFrameProps['renderSlo
       useSessions={useSessions}
       usePanelInfo={usePanelInfo}
       useFoldedLandscape={bindSnapshotSelector(foldedLandscape)}
+      useEditorSide={bindSnapshotSelector(editorSide)}
       useSessionStatus={useSessionStatus}
       useSessionRetainInfo={() => undefined}
       useContextMenu={contextMenuHook()} useResource={useResource}
@@ -110,7 +112,7 @@ function mountFrame(windowWidth = frameWidth, content?: AppFrameProps['renderSlo
   const utils = render(element())
   const frame = utils.container.firstElementChild as HTMLElement
   return {
-    ...utils, instance, frame, slotCalls,
+    ...utils, instance, frame, slotCalls, editorSide,
     rerenderFrame: () => { utils.rerender(element()) },
     rightOwner: () => slotCalls.findLast(c => c.key === 'rightbar')!.props as RightbarOwnerProps,
     sidebarOwner: () => slotCalls.findLast(c => c.key === 'sidebar')!.props as SidebarOwnerProps,
@@ -157,6 +159,7 @@ beforeEach(() => {
   vi.stubEnv('DSH_CLIENT_TITLE', undefined)
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
   foldedLandscape = createSnapshotStore(false)
+  editorSide = createSnapshotStore<'left' | 'right'>('right')
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     const id = nextFrame++
@@ -339,6 +342,18 @@ describe('AppFrame normal width concessions', () => {
     expect(instance.getSnapshot().layoutInfo.rightbar).toBe(450)
     resize(1920)
     expect(rightOwner().width).toBe(450)
+  })
+
+  it('scales a left-docked panel with the frame and keeps a right-docked one at its px preference', () => {
+    const { instance, editorSide } = mountFrame()
+    act(() => { editorSide.set('left') })
+    act(() => { instance.actions.openRightbar(true, false) })
+    expect(instance.getSnapshot().layoutInfo.rightbar).toBe(864)
+    resize(2400)
+    expect(instance.getSnapshot().layoutInfo.rightbar).toBe(1080)
+    act(() => { editorSide.set('right') })
+    resize(1200)
+    expect(instance.getSnapshot().layoutInfo.rightbar).toBe(1080)
   })
 
   it('shrinks the right panel to 300px, drops its track, and only then squeezes center', () => {
@@ -609,6 +624,26 @@ describe('AppFrame pointer resizing', () => {
     expect(instance.getSnapshot().layoutInfo.sidebar).toBe(360)
     expect(frame.dataset.dragging).toBeUndefined()
     expect(handle.hasPointerCapture(1)).toBe(false)
+  })
+
+  it('places the dock left of the conversation and drags it from its inner edge', () => {
+    frameWidth = 1100
+    const { frame, instance, rerenderFrame, rightOwner } = mountFrame()
+    act(() => { instance.actions.openRightbar(true, false) })
+    act(() => { editorSide.set('left') })
+    rerenderFrame()
+    expect(frame.dataset.editorSide).toBe('left')
+    const match = /^([\d.]+)px minmax\(0px, ([\d.]+)px\) minmax\((0|400)px, 1fr\)$/.exec(frame.style.gridTemplateColumns)
+    expect(match).not.toBeNull()
+    const sidebar = Number(match![1])
+    const rightbar = rightOwner().width
+    expect(rightbar).toBeGreaterThan(0)
+    // The handle rides the dock's inner (right) edge, before the conversation.
+    const handle = handleFor(frame, 'rightbar')
+    expect(handle.style.left).toBe(`${sidebar + rightbar}px`)
+    // Dragging that edge right widens the dock.
+    drag(handle, sidebar + rightbar, sidebar + rightbar + 40)
+    expect(instance.getSnapshot().layoutInfo.rightbar).toBeGreaterThan(rightbar)
   })
 
   it('starts a conceded right drag at its actual width, shared by panel and track', () => {

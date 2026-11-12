@@ -1,5 +1,7 @@
-import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { fileLeafName, fileStem } from './file-name.ts'
 import { TabMenuContent } from './shell/TabMenuContent.tsx'
 import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /**
@@ -140,12 +142,20 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.slots.inject('contextMenu.icon', () => ctx.slots.register({
     name: 'contextMenu.icon', key: 'sidebar.close',
   }, IconCloseOutlineRegular)), 'sidebar: menu icon')
+  // Copies the file tab's leaf name; the second entry keeps its extension.
+  const copyFileName = async (path: string, withExtension: boolean): Promise<void> => {
+    const leaf = fileLeafName(path)
+    const text = withExtension ? leaf : fileStem(leaf)
+    const copied = await writeClipboard(text)
+    ctx.contextMenus.notify(copied ? t('menu.copiedName', { name: text }) : t('menu.copyNameFailed'), copied)
+  }
   ctx.effect(() => ctx.contextMenus.register({
     id: 'sidebar.close', target: 'tab', order: 100,
     resolve: ({ sessionId, paneId, tab }) => {
       const tabId = tab.id
       const tabs = controller.menuTabs(sessionId, paneId, tabId)
       if (!tabs.close && tabs.all.length === 0) return []
+      const file = parseFileAddress(tab.contentId)
       const closeMany = (ids: readonly TabId[]) => {
         for (const id of ids) {
           if (controller.menuTabs(sessionId, paneId, tabId).all.includes(id)) controller.closeIn(sessionId, id)
@@ -155,6 +165,10 @@ export function apply(ctx: ClientContext): void {
         { id: 'close', commandId: 'page.close' as ShortcutCommandId, icon: { key: 'sidebar.close' }, label: t('menu.close'), disabled: !tabs.close, run: () => { if (controller.menuTabs(sessionId, paneId, tabId).close) controller.closeIn(sessionId, tabId) } },
         { id: 'others', label: t('menu.closeOthers'), disabled: tabs.all.length === 0, run: () => { closeMany(tabs.all) } },
         ...tabs.right.length === 0 ? [] : [{ id: 'right', label: t('menu.closeRight'), run: () => { closeMany(tabs.right) } }],
+        ...file === undefined ? [] : [
+          { id: 'copyName', separatorBefore: true, label: t('menu.copyFileName'), run: () => { void copyFileName(file.path, false) } },
+          { id: 'copyNameWithExtension', label: t('menu.copyFileNameWithExtension'), run: () => { void copyFileName(file.path, true) } },
+        ],
       ]
     },
   }), 'sidebar: menu actions')

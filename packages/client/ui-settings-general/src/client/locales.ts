@@ -3,6 +3,10 @@
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'desktop.channel.title': '更新渠道',
+  'editorSide.title': '编辑器区位置',
+  'editorSide.description': '文件树与文件标签放在会话的哪一侧',
+  'editorSide.left': '左侧',
+  'editorSide.right': '右侧',
   'desktop.channel.description': '正式版适合日常使用；开发版可提前体验新功能，但可能不稳定。',
   'desktop.channel.stable': '正式版',
   'desktop.channel.nightly': '开发版',
@@ -75,6 +79,10 @@ export type SettingsKey = keyof typeof zh
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
   'desktop.channel.title': 'Update channel',
+  'editorSide.title': 'Editor dock position',
+  'editorSide.description': 'Which side of the conversation holds the file tree and file tabs',
+  'editorSide.left': 'Left',
+  'editorSide.right': 'Right',
   'desktop.channel.description': 'Stable is suitable for everyday use. Development offers early access to new features but may be unstable.',
   'desktop.channel.stable': 'Stable',
   'desktop.channel.nightly': 'Development',
@@ -144,6 +152,10 @@ export const en = {
 /** Japanese copy, checked against the English keys. */
 export const ja = {
   'desktop.channel.title': '更新チャンネル',
+  'editorSide.title': 'エディター領域の位置',
+  'editorSide.description': 'ファイルツリーとファイルタブを会話のどちら側に置くか',
+  'editorSide.left': '左',
+  'editorSide.right': '右',
   'desktop.channel.description': '安定版は日常的な使用に適しています。開発版では新機能をいち早く試せますが、不安定な場合があります。',
   'desktop.channel.stable': '安定版',
   'desktop.channel.nightly': '開発版',
@@ -213,6 +225,10 @@ export const ja = {
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
   'desktop.channel.title': 'Canal de actualizaciones',
+  'editorSide.title': 'Posición del área de editor',
+  'editorSide.description': 'En qué lado de la conversación se muestran el árbol y las pestañas de archivos',
+  'editorSide.left': 'Izquierda',
+  'editorSide.right': 'Derecha',
   'desktop.channel.description': 'Estable es adecuado para el uso diario. Desarrollo permite probar nuevas funciones antes, pero puede ser inestable.',
   'desktop.channel.stable': 'Estable',
   'desktop.channel.nightly': 'Desarrollo',
@@ -282,6 +298,10 @@ export const es = {
 /** French dictionary, checked against the English keys. */
 export const fr = {
   'desktop.channel.title': 'Canal de mise à jour',
+  'editorSide.title': 'Position de la zone d’édition',
+  'editorSide.description': 'De quel côté de la conversation se trouvent l’arborescence et les onglets de fichiers',
+  'editorSide.left': 'Gauche',
+  'editorSide.right': 'Droite',
   'desktop.channel.description': 'Stable convient à un usage quotidien. Développement permet de découvrir les nouveautés en avance, mais peut être instable.',
   'desktop.channel.stable': 'Stable',
   'desktop.channel.nightly': 'Développement',
@@ -351,6 +371,10 @@ export const fr = {
 /** German dictionary, checked against the English keys. */
 export const de = {
   'desktop.channel.title': 'Update-Kanal',
+  'editorSide.title': 'Position des Editorbereichs',
+  'editorSide.description': 'Auf welcher Seite der Unterhaltung Dateibaum und Datei-Tabs liegen',
+  'editorSide.left': 'Links',
+  'editorSide.right': 'Rechts',
   'desktop.channel.description': 'Stabil eignet sich für den Alltag. Entwicklung bietet frühzeitigen Zugang zu neuen Funktionen, kann aber instabil sein.',
   'desktop.channel.stable': 'Stabil',
   'desktop.channel.nightly': 'Entwicklung',
@@ -420,6 +444,10 @@ export const de = {
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
   'desktop.channel.title': 'Канал обновлений',
+  'editorSide.title': 'Положение области редактора',
+  'editorSide.description': 'С какой стороны беседы находятся дерево и вкладки файлов',
+  'editorSide.left': 'Слева',
+  'editorSide.right': 'Справа',
   'desktop.channel.description': 'Стабильный канал подходит для повседневного использования. Канал разработки позволяет раньше попробовать новые функции, но может быть нестабильным.',
   'desktop.channel.stable': 'Стабильный',
   'desktop.channel.nightly': 'Разработка',
@@ -489,6 +517,10 @@ export const ru = {
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
   'desktop.channel.title': 'Canal de atualização',
+  'editorSide.title': 'Posição da área do editor',
+  'editorSide.description': 'Em qual lado da conversa ficam a árvore e as abas de arquivos',
+  'editorSide.left': 'Esquerda',
+  'editorSide.right': 'Direita',
   'desktop.channel.description': 'Estável é adequado para o uso diário. Desenvolvimento oferece acesso antecipado a novos recursos, mas pode ser instável.',
   'desktop.channel.stable': 'Estável',
   'desktop.channel.nightly': 'Desenvolvimento',

@@ -74,6 +74,21 @@
   border-left: 0;
 }
 
+/* The frame's file dock may sit left of the conversation (`FileNavigator`
+   reads the frame's `editorSide`): the navigator then precedes the pane's
+   content, so its rule and resize edge face right. Filling and page layouts
+   have no content beside them to separate from. */
+.navigator[data-files-navigator-side='left']:not(.wholePage):not(.fill) {
+  order: -1;
+  border-right: 0.5px solid var(--dsw-alias-border-l3);
+  border-left: 0;
+}
+
+.navigator[data-files-navigator-side='left']:not(.wholePage):not(.fill) .separator {
+  right: -4px;
+  left: auto;
+}
+
 /* Covered content stays laid out but cannot receive keyboard focus. The rule
    names its row through `data-files-navigator-row`: a `:has()` without a
    subject makes the browser restyle the whole document after any DOM change. */
@@ -94,6 +109,11 @@
     width: auto;
     height: auto;
     border-left: 0;
+  }
+
+  /* A covering navigator draws no rule on either side, whichever side it is on. */
+  .navigator[data-files-navigator-side='left']:not(.wholePage):not(.fill) {
+    border-right: 0;
   }
 
   .separator {
@@ -129,7 +149,8 @@
     margin: 8px;
   }
 
-  /* Below it: floating over the body's right part. */
+  /* Below it: floating over the body's right part, or its left part when the
+     frame places the dock left of the conversation. */
   .overlay {
     position: absolute;
     top: 8px;
@@ -137,6 +158,11 @@
     bottom: 8px;
     z-index: 2;
     height: auto;
+  }
+
+  .navigator[data-files-navigator-side='left'].overlay {
+    right: auto;
+    left: 8px;
   }
 
   :global(body[data-ds-dark-theme]) .push,

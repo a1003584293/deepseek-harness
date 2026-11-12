@@ -77,7 +77,8 @@ async function boot(shortcuts: Partial<Shortcuts> = {}) {
   const resources = { pin: vi.fn<(address: string, signal: AbortSignal) => void>() }
   const menus = new MenuRegistry(vi.fn())
   onTestFinished(() => { menus.dispose() })
-  ctx.provide('contextMenus', { register: menus.register.bind(menus), open: vi.fn() } as never)
+  const notifications = vi.fn()
+  ctx.provide('contextMenus', { register: menus.register.bind(menus), open: vi.fn(), notify: notifications } as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
   ctx.provide('shortcuts', { runtime: 'web', register: () => () => {},
@@ -97,7 +98,7 @@ async function boot(shortcuts: Partial<Shortcuts> = {}) {
     if (entry.inject === undefined) throw new Error(`expected ${entry.name} to inject`)
     return entry.inject(SESSION)
   }
-  return { ctx, menus, slots, registered, dictionaries, layout, current, resources, fiber, seat, injectedOf }
+  return { ctx, menus, notifications, slots, registered, dictionaries, layout, current, resources, fiber, seat, injectedOf }
 }
 
 describe('ui-sidebar-right apply', () => {
@@ -387,6 +388,7 @@ it('closes captured pane tabs and rechecks tabs moved or closed while their menu
   const right = h.menus.resolve(target(first))
   expect(right.source.getSnapshot().map(action => [action.id, action.icon !== undefined])).toEqual([
     ['sidebar.close/close', true], ['sidebar.close/others', false], ['sidebar.close/right', false],
+    ['sidebar.close/copyName', false], ['sidebar.close/copyNameWithExtension', false],
   ])
   h.ctx.sidebarRight.closeIn(SESSION, second.id)
   right.select('sidebar.close/right')
@@ -403,5 +405,34 @@ it('closes captured pane tabs and rechecks tabs moved or closed while their menu
   h.ctx.sidebarRight.closeIn(SESSION, fresh.id)
   stale.select('sidebar.close/close')
   expect(instance.getSnapshot().bySession[SESSION]!.layout.tabs[fresh.id]).toBeUndefined()
+  instance.clearPersisted()
+})
+
+it('copies a file tab name with or without its final extension', async () => {
+  const h = await boot()
+  onTestFinished(async () => { await h.ctx.fiber.dispose() })
+  vi.stubGlobal('document', { activeElement: null, querySelectorAll: () => [] })
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  const writeText = vi.fn<() => Promise<void>>(() => Promise.resolve())
+  vi.stubGlobal('navigator', { clipboard: { writeText } })
+  const handle = h.seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+  const instance = handle.create(SESSION)
+  instance.clearPersisted()
+  instance.actions.open(SESSION)
+  instance.actions.openContent(
+    SESSION,
+    { kind: 'text', contentId: 'dsh-resource://file/session/s/home/me/notes.ts', title: 'notes.ts' },
+    () => {},
+  )
+  const surface = instance.getSnapshot().bySession[SESSION]!
+  const tab = Object.values(surface.layout.tabs).find(candidate => candidate.title === 'notes.ts')!
+  const target = { kind: 'tab', value: { sessionId: SESSION, paneId: surface.layout.activePaneId, tab } } as const
+  const withoutExtension = h.menus.resolve(target)
+  withoutExtension.select('sidebar.close/copyName')
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('notes') })
+  await vi.waitFor(() => { expect(h.notifications).toHaveBeenCalledOnce() })
+  const withExtension = h.menus.resolve(target)
+  withExtension.select('sidebar.close/copyNameWithExtension')
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('notes.ts') })
   instance.clearPersisted()
 })

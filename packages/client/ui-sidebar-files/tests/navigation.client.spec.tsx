@@ -75,7 +75,7 @@ function harness() {
         return () => { unsubscribe(); tab.listeners.delete(listener) }
       },
     }
-  }, vi.fn<SearchWorkspace>(() => { throw new Error('Navigation must not search') }), memoryBook())(SESSION, instance, () => () => {})
+  }, vi.fn<SearchWorkspace>(() => { throw new Error('Navigation must not search') }), memoryBook(), createSnapshotStore<'left' | 'right'>('right'))(SESSION, instance, () => () => {})
 
   const tab = (id: TabId, revision = 0): TestTab => {
     const address = sessionFileAddress(SESSION, `${id}.ts`)

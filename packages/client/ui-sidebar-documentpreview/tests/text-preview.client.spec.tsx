@@ -903,7 +903,7 @@ describe('TextPreview — workspace navigator Factories', () => {
     expect(navigator.scrollTop).toBe(64)
   })
 
-  it.each([false, true])('owns the navigator open callback and replaces itself (floating: %s)', async (isFloating) => {
+  it.each([false, true])('opens a navigator file in a new tab of this pane (floating: %s)', async (isFloating) => {
     const h = harness({ 1: page(1, ['a'], true) })
     const props = h.props()
     const info = props.useTabInfo()
@@ -920,7 +920,9 @@ describe('TextPreview — workspace navigator Factories', () => {
     await settle()
     expect(open).toBeTypeOf('function')
     open!('dsh-resource://file/session/s-1/b.txt')
-    expect(openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/s-1/b.txt', { replaceTab: true })
+    // A tree pick is new content: it lands beside the preview, never on top of it.
+    if (isFloating) expect(openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/s-1/b.txt')
+    else expect(openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/s-1/b.txt', { paneId: info.panel.id })
   })
 
   it('starts a text preview without a notice with its header', async () => {

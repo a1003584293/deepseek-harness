@@ -370,3 +370,14 @@
 .overlayLayer > * {
   pointer-events: auto;
 }
+
+/* File dock on the left: the same two tracks in the opposite order, so the
+   navigation sidebar still pushes the dock and the conversation instead of
+   overlaying them. */
+.frame[data-editor-side='left'] .centerCol {
+  grid-column: 3;
+}
+
+.frame[data-editor-side='left'] .rightbarCol {
+  grid-column: 2;
+}

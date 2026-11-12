@@ -180,6 +180,12 @@ export interface FilesInjected {
    */
   readonly hide: (paneId: PaneId) => void
   /**
+   * Whether a pane currently shows its preview navigator.
+   * @param paneId - the pane to query.
+   * @returns whether the navigator is drawn, or will be once the pane attaches.
+   */
+  readonly isShown: (paneId: PaneId) => boolean
+  /**
    * Show a pane's navigator and its search bar, and give the field keyboard focus now,
    * or when it is next drawn; a pane drawn but not yet attached shows it once attached.
    * Focusing the always-visible files page leaves the pane's preview-navigator show choice unchanged.
@@ -271,6 +277,8 @@ export interface FilesInjected {
   readonly hooks: {
     /** Whether some registered tab type can open an address; a new predicate whenever the tab types change. */
     readonly canOpen: HostObservable<(address: string) => boolean>
+    /** Which side of the conversation the frame places this navigator on. */
+    readonly editorSide: HostObservable<'left' | 'right'>
   }
   readonly keyedHooks: {
     /** The measured width of the row a pane's navigator is laid out in, in CSS pixels, keyed by pane id; `undefined` until measured. */
@@ -390,6 +398,7 @@ export type PlaceFace = (tabId: TabId, face: FilesInjected) => () => void
  * @param navigationOf - the attached tab's navigation; subscriptions end with this plugin or their disposer.
  * @param search - the workspace search.
  * @param preferences - every workspace's search preferences, shared by every Session.
+ * @param editorSide - which side of the conversation the frame places the navigator on.
  * @returns the face factory: session, its store instance, and where to place the face beside tabs in, face out.
  */
 export function filesFace(
@@ -399,6 +408,7 @@ export function filesFace(
   navigationOf: (sessionId: SessionId, tabId: TabId) => HostObservable<SidebarRightTabNavigation>,
   search: SearchWorkspace,
   preferences: WorkspaceSearchPreferenceBook,
+  editorSide: HostObservable<'left' | 'right'>,
 ): (
   sessionId: SessionId,
   store: Pick<FilesStoreInstance, 'actions' | 'getSnapshot' | 'subscribe'>,
@@ -665,6 +675,10 @@ export function filesFace(
           pane.show = false
           if (pane.navigator === undefined || pane.closable) actions.shown(paneId, true)
           else actions.searchBarShown(paneId, true)
+        } else if (store.getSnapshot().byPane[paneId]?.open === undefined) {
+          // A pane's first preview opens with the tree shown; a hide chosen in
+          // that pane persists for its later tabs and suppresses this default.
+          actions.shown(paneId, true)
         }
         pane.mounts += 1
         let home = homes.get(tabId)
@@ -729,6 +743,12 @@ export function filesFace(
         if (pane?.lifetime === undefined) return
         if (resultsShown(paneId)) pane.searchScrollTop = scrollTop
         else pane.scrollTop = scrollTop
+      },
+      isShown(paneId) {
+        const pane = panes.get(paneId)
+        return pane?.lifetime === undefined
+          ? pane?.show === true
+          : store.getSnapshot().byPane[paneId]?.open === true
       },
       hide(paneId) {
         const pane = panes.get(paneId)
@@ -947,7 +967,7 @@ export function filesFace(
         if (pane !== undefined) pane.toggle = undefined
         drop(paneId)
       },
-      hooks: { canOpen },
+      hooks: { canOpen, editorSide },
       keyedHooks: { rowWidth: paneId => record(paneId as PaneId).width, searchPreferences: cwd => preferences.source(cwd) },
     }
     return face

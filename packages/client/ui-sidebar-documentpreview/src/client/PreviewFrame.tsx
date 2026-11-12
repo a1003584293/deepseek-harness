@@ -22,10 +22,13 @@ type NavigatorSeatProps = Pick<PropsRuntime<'sidebar.right.pane.tab'>, 'useTabIn
 
 /** The workspace navigator after the preview's content. */
 const NavigatorSeat = memo(function NavigatorSeat({ useTabInfo, renderFactorySlot }: NavigatorSeatProps): ReactNode {
-  const { tab } = useTabInfo()
+  const { tab, panel } = useTabInfo()
   const onOpen = useCallback((address: string): void => {
-    tab.actions.openResource(address, { replaceTab: true })
-  }, [tab.actions])
+    // A file picked in the workspace tree is independent content: open it as a
+    // new tab in this pane instead of replacing the preview that shows the tree.
+    if (panel.isFloating) tab.actions.openResource(address)
+    else tab.actions.openResource(address, { paneId: panel.id })
+  }, [tab.actions, panel.id, panel.isFloating])
   return renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: false, onOpen })
 })
 

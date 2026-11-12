@@ -103,7 +103,9 @@ describe('FilesBody', () => {
     const input = h.view.container.querySelector<HTMLInputElement>('[data-files-search]')!
     expect(document.activeElement).toBe(input)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(h.instance.getSnapshot().byPane[PANE]?.open).toBeUndefined()
+    // The pane's first drawing records the default shown choice; the page's
+    // own tree fills it regardless.
+    expect(h.instance.getSnapshot().byPane[PANE]?.open).toBe(true)
     h.searches.answerWith(answer(['src/target.ts']))
     await act(async () => {
       fireEvent.change(input, { target: { value: 'target' } })
@@ -307,8 +309,8 @@ describe('FilesBody', () => {
     const address = fileAddressFor(SESSION, ROOT, `${ROOT}/README.md`)
     if (isFloating) expect(tabActions.openResource).toHaveBeenCalledExactlyOnceWith(address)
     else expect(tabActions.openResource).toHaveBeenCalledExactlyOnceWith(address, { paneId: PANE })
-    // The page writes no tree choice for its pane, where the file it appends draws.
-    expect(instance.getSnapshot().byPane[PANE]?.open).toBeUndefined()
+    // The tree keeps the default shown choice for the pane, where the file it appends draws.
+    expect(instance.getSnapshot().byPane[PANE]?.open).toBe(true)
     expect(view.container.querySelector('[data-files-navigator]')).not.toBeNull()
     const other = view.container.querySelector(`[data-files-path="${ROOT}/pipe"]`)!
     expect(other.querySelector('button')).toBeNull()

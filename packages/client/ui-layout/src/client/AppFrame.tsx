@@ -1,9 +1,10 @@
 /**
  * Three-column shell frame, registered into the built-in 'root' slot (the web
  * shell renders only 'root'). Owns the grid tracks (sidebar | center |
- * rightbar), the drag handles (pointer capture + rAF throttle), the column
- * solve (columns.ts), and the child-slot render decisions: the sidebar slot
- * receives live parameters from that solve. The root-scoped main slot selects
+ * rightbar, or sidebar | rightbar | center while the editor-side preference is
+ * left), the drag handles (pointer capture + rAF throttle), the column solve
+ * (columns.ts), and the child-slot render decisions: the sidebar slot receives
+ * live parameters from that solve. The root-scoped main slot selects
  * the Conversation or a global panel. Each column occupant owns its Session
  * binding and reports the geometry it needs.
  *
@@ -26,7 +27,11 @@ import css from './AppFrame.module.css'
 
 /** Browser posture supplied by the root registration. */
 export interface AppFrameInjected {
-  hooks: { foldedLandscape: HostObservable<boolean> }
+  hooks: {
+    foldedLandscape: HostObservable<boolean>
+    /** Which side of the conversation the file dock occupies. */
+    editorSide: HostObservable<'left' | 'right'>
+  }
 }
 
 /** Full composed props: runtime, child slots, store, locale, and injected posture. */
@@ -131,14 +136,21 @@ export function AppFrame({
   useSessions,
   usePanelInfo,
   useFoldedLandscape,
+  useEditorSide,
   actions,
   renderSlot,
   t,
 }: AppFrameProps) {
   const layoutInfo = useStore(state => state.layoutInfo)
+  const editorSide = useEditorSide(side => side)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const viewport = layoutInfo.viewportWidth
   const foldedLandscape = useFoldedLandscape(matches => matches)
+  // The side decides the track order, the resize direction, and whether the
+  // frame scales the dock's width with the window.
+  const editorOnLeft = editorSide === 'left'
+  const editorOnLeftRef = useRef(editorOnLeft)
+  editorOnLeftRef.current = editorOnLeft
 
   // Track the frame's own box (not the window): rAF-throttled ResizeObserver.
   useLayoutEffect(() => {
@@ -149,7 +161,10 @@ export function AppFrame({
     let disposed = false
     const measure = () => {
       const width = el.getBoundingClientRect().width
-      if (width > 0) actions.setViewportWidth(width)
+      // With the dock left of the conversation, the conversation is the
+      // flexible column: resize both proportionally instead of pouring every
+      // window size change into the conversation alone.
+      if (width > 0) actions.setViewportWidth(width, editorOnLeftRef.current)
     }
     measure()
     const observer = new ResizeObserver(() => {
@@ -255,8 +270,10 @@ export function AppFrame({
     actions.setSidebar(sidebarBase.current + dx)
   }, [actions])
   const onRightbarStart = useCallback(() => { rightbarBase.current = rightbarWidth.current; setDragging(true) }, [])
+  // The dock's inner edge moves with its own left edge: dragging right widens
+  // it on the left side and narrows it on the right.
   const onRightbarDrag = useCallback((dx: number) => {
-    actions.setRightbar(rightbarBase.current - dx)
+    actions.setRightbar(rightbarBase.current + (editorOnLeftRef.current ? dx : -dx))
   }, [actions])
   const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
   // The rendered template lets the grid solve the squeeze natively: the centre
@@ -292,9 +309,11 @@ export function AppFrame({
       style={{
         ...(windowsTitlebar
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
-        gridTemplateColumns:
-          `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
+        gridTemplateColumns: editorOnLeft
+          ? `${cols.sidebar}px minmax(0px, ${rightbarMax}px) minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr)`
+          : `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
       }}
+      data-editor-side={editorSide}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-sidebar-drawer={drawer || undefined}
       data-sidebar-instant={drawer && sidebarCollapsed && sidebarTransition.instant || undefined}
@@ -336,7 +355,13 @@ export function AppFrame({
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
       {!drawer && !centeredSidebar && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
-        <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
+        <DragHandle
+          side="rightbar"
+          left={editorOnLeft ? cols.sidebar + normal.rightbar : viewport - normal.rightbar}
+          onStart={onRightbarStart}
+          onDrag={onRightbarDrag}
+          onEnd={onDragEnd}
+        />
       )}
     </div>
   )

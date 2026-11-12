@@ -24,6 +24,7 @@ import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls ctx.locale into this program.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
@@ -42,6 +43,7 @@ import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { CurrentVersionRow } from './CurrentVersionRow.tsx'
 import { DeveloperToolsRow, type DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
+import { EditorSideRow, type EditorSideRowInjected } from './EditorSideRow.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { SettingsDocumentStore } from './settings-document-store.ts'
@@ -74,7 +76,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess', 'layout']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -97,6 +99,14 @@ export function apply(ctx: ClientContext): void {
       },
     }),
   }, DeveloperToolsRow))
+  // The file dock's side is a frame preference the layout service owns.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'editor-side', order: 12, locale: NS,
+    inject: (): EditorSideRowInjected => ({
+      hooks: { editorSide: ctx.layout.editorSide },
+      setEditorSide: (side) => { ctx.layout.setEditorSide(side) },
+    }),
+  }, EditorSideRow))
   // Version information follows the core preferences.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item', id: 'current-version', order: 100, locale: NS,

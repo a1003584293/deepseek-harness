@@ -24,13 +24,15 @@ const LEVEL: DirLevel = { entries: [{ name: 'src', type: 'directory' }], truncat
 
 /** Every address opens. */
 const CAN_OPEN = { getSnapshot: () => () => true, subscribe: () => () => {} }
+/** The frame's shipped file-dock side. */
+const RIGHT_SIDE = { getSnapshot: () => 'right' as const, subscribe: () => () => {} }
 
 function mount() {
   const instance = createFilesStore().create()
   const script = scriptedList()
   /** The tabs the face placed itself beside, with each placement's release. */
   const placed: { readonly tabId: TabId; readonly face: FilesInjected; readonly release: Mock<() => void> }[] = []
-  const face = filesFace(script.list, script.watch, CAN_OPEN, () => ({ getSnapshot: () => ({ address: '', params: undefined, revision: 0 }), subscribe: () => () => {} }), scriptedSearch().search, memoryBook())(SESSION, instance, (tabId, bound) => {
+  const face = filesFace(script.list, script.watch, CAN_OPEN, () => ({ getSnapshot: () => ({ address: '', params: undefined, revision: 0 }), subscribe: () => () => {} }), scriptedSearch().search, memoryBook(), RIGHT_SIDE)(SESSION, instance, (tabId, bound) => {
     const release = vi.fn<() => void>()
     placed.push({ tabId, face: bound, release })
     return release
@@ -481,8 +483,10 @@ describe('filesFace pane records follow the tabs that drew them', () => {
     h.face.focus(PANE)
     h.face.attach(OTHER, TAB, tab.signal)
     await Promise.resolve()
-    // The pane it left is forgotten, and the pane it arrived in starts without a record.
-    expect(h.instance.getSnapshot().byPane).toEqual({})
+    // The pane it left is forgotten; the pane it arrived in keeps the default
+    // shown choice its first drawing recorded.
+    expect(h.instance.getSnapshot().byPane[PANE]).toBeUndefined()
+    expect(h.instance.getSnapshot().byPane[OTHER]?.open).toBe(true)
     h.face.focus(OTHER)
     expect(h.instance.getSnapshot().byPane[OTHER]?.open).toBe(true)
     tab.abort()

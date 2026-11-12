@@ -17,13 +17,15 @@ const PANE = 'pane-1' as PaneId
 const CAN_OPEN = { getSnapshot: () => () => true, subscribe: () => () => {} }
 /** No tab navigates. */
 const NO_NAVIGATION = () => ({ getSnapshot: () => ({ address: '', params: undefined, revision: 0 }), subscribe: () => () => {} })
+/** The frame's shipped file-dock side. */
+const RIGHT_SIDE = { getSnapshot: () => 'right' as const, subscribe: () => () => {} }
 
 /** One Session's face over a shared book, with its pane attached. */
 function session(id: string, book: WorkspaceSearchPreferenceBook) {
   const instance = createFilesStore().create()
   const script = scriptedList()
   const searches = scriptedSearch(['src/a.ts'])
-  const face = filesFace(script.list, script.watch, CAN_OPEN, NO_NAVIGATION, searches.search, book)(
+  const face = filesFace(script.list, script.watch, CAN_OPEN, NO_NAVIGATION, searches.search, book, RIGHT_SIDE)(
     id as SessionId, instance, () => () => {},
   )
   const tab = new AbortController()
