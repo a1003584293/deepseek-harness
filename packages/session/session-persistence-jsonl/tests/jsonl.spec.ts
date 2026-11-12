@@ -2923,3 +2923,38 @@ describe('JsonlSessionPersistence listing concurrency', () => {
     await expect(listingCtx.sessionPersistence.list()).rejects.toBe(earlierSessionFailure)
   })
 })
+
+describe('JsonlSessionPersistence: physical removal', () => {
+  it('removes the stored session directory and reports an absent session afterwards', async () => {
+    const dir = await freshRoot()
+    const ctx = new Context()
+    const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
+    const persistence = ctx.sessionPersistence
+    const header = meta('remove-me', '/work')
+    await writeLog(persistence, header, oneTurnLog())
+    expect(await persistence.stat(header.id)).toBeDefined()
+    expect(await persistence.remove?.(header.id)).toBe(true)
+    expect(await persistence.stat(header.id)).toBeUndefined()
+    expect(await persistence.list()).toEqual([])
+    // A second removal reports nothing left to delete.
+    expect(await persistence.remove?.(header.id)).toBe(false)
+    await fiber.dispose()
+  })
+
+  it('refuses to remove a session this process still holds open', async () => {
+    const dir = await freshRoot()
+    const ctx = new Context()
+    const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
+    const persistence = ctx.sessionPersistence
+    const header = meta('open-me', '/work')
+    const handle = await persistence.create(header)
+    await handle.append(oneTurnLog())
+    try {
+      await expect(persistence.remove?.(header.id)).rejects.toThrow('still open in this process')
+    } finally {
+      await handle.close()
+    }
+    expect(await persistence.remove?.(header.id)).toBe(true)
+    await fiber.dispose()
+  })
+})

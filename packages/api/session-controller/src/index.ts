@@ -62,6 +62,8 @@ import type {
   SessionSelectModelValue,
   SessionProjectionsRequest,
   SessionProjectionsValue,
+  SessionDeleteRequest,
+  SessionDeleteValue,
   SessionUpdateQueueRequest,
   SessionUpdateQueueValue,
 } from './types.ts'
@@ -489,6 +491,44 @@ export class SessionController extends TypertRemoteService {
       ...(principal === undefined ? {} : { principal }),
     }
     return this.commands.prompt(request, source)
+  }
+
+  /**
+   * Permanently delete one stored Session and its durable log. A Session open
+   * in this process is refused: the caller must leave it first. Archived and
+   * pinned memberships are dropped so the identity does not linger.
+   * @param request - Session to delete.
+   * @returns whether any stored artifact was removed.
+   */
+  @Remote('delete')
+  async delete(request: SessionDeleteRequest): Promise<SessionDeleteValue> {
+    if (this.ctx.sessions.get(request.sessionId) !== undefined) {
+      throw new RemoteError(
+        'session/agent-busy',
+        'the session is still open in this process; close it before deleting',
+        { reason: 'SESSION_OPEN' },
+      )
+    }
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence?.remove === undefined) {
+      throw new RemoteError(
+        'session/delete-unsupported',
+        'the mounted session persistence backend cannot delete stored sessions',
+        { sessionId: request.sessionId },
+      )
+    }
+    const workspace = this.ctx.get('workspaceRegistry')
+    if (workspace !== undefined) {
+      // Best effort: an absent membership is not an error, and a stale id in
+      // either durable set would keep resolving to a deleted Session.
+      await workspace.unarchiveSession(request.sessionId).catch(() => undefined)
+      await workspace.unpinSession(request.sessionId).catch(() => undefined)
+    }
+    const deleted = await persistence.remove(request.sessionId)
+    if (deleted) await this.ctx.get('sessionProjectionCache')?.forget(request.sessionId)
+    // Drop the row from live client lists without waiting for the next scan.
+    if (deleted) this.ctx.emit('api-session/removed', request.sessionId)
+    return { deleted }
   }
 
   /**

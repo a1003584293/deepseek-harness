@@ -902,6 +902,38 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /**
+   * Permanently delete every stored artifact of one Session, including older
+   * format generations in the same session directory.
+   * @param id - the stored Session to delete.
+   * @param options - optional cancellation between directory removals.
+   * @returns whether at least one session directory was removed.
+   * @throws when this process still holds the Session open or is writing it.
+   */
+  override async remove(id: SessionId, options?: { readonly signal?: AbortSignal }): Promise<boolean> {
+    if (this.tracker.hasWriter(id)) {
+      throw new Error(`session-persistence-jsonl: session "${id}" is still open in this process`)
+    }
+    await this.ensureRootEncoding()
+    options?.signal?.throwIfAborted()
+    let removed = false
+    for (const project of await this.listProjectDirs(options?.signal)) {
+      options?.signal?.throwIfAborted()
+      const dir = join(project, encodeSegment(id))
+      try {
+        if (!(await stat(dir)).isDirectory()) continue
+      } catch (error: unknown) {
+        if (isENOENT(error)) continue
+        throw error
+      }
+      // force survives read-only artifacts a crashed write left behind.
+      await rm(dir, { recursive: true, force: true })
+      removed = true
+    }
+    this.coldLogMemo.delete(id)
+    return removed
+  }
+
+  /**
    * Durably append one validated batch; lazily materializes on the first write.
    * @param header - the session's stored header.
    * @param events - the validated contiguous batch, in seq order.

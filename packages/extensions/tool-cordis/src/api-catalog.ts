@@ -2981,6 +2981,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'acknowledgement that the Agent accepted the prompt.',
       },
       {
+        signature: '@Remote(\'delete\') async delete(request: SessionDeleteRequest): Promise<SessionDeleteValue>',
+        description: 'Permanently delete one stored Session and its durable log. A Session open in this process is refused: the caller must leave it first. Archived and pinned memberships are dropped so the identity does not linger.',
+        parameters: [{ name: 'request', description: 'Session to delete.' }],
+        returns: 'whether any stored artifact was removed.',
+      },
+      {
         signature: '@Remote(\'attachment\') attachment(request: SessionAttachmentRequest): Promise<SessionAttachmentValue>',
         description: 'Read one image from the attachment store after gateway authorization.',
         parameters: [{ name: 'request', description: 'image reference and gateway permission scope; Session existence is not checked.' }],
@@ -3136,6 +3142,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'options', description: 'optional cancellation.' }],
         returns: 'one snapshot per stored session.',
       },
+      {
+        signature: 'remove?(id: SessionId, options?: { readonly signal?: AbortSignal }): Promise<boolean>',
+        description: 'Permanently delete every durable artifact this backend stores for one Session. Implementations that cannot remove stored logs omit the method, and callers must fail loudly rather than report a deletion.',
+        parameters: [{ name: 'id', description: 'the stored Session to delete.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: 'whether any stored artifact was removed.',
+      },
     ],
   },
   {
@@ -3143,6 +3155,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'The persisted projection cache service.',
     description: 'The persisted projection cache service. Opens the `session_projcache` domain at init, checkpoints live sessions on a throttled write-behind (count/interval triggers from Config) plus three mandatory points — session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the cached rows for a session header. Every durable write is fail-soft: failures log a warning and the cache self-heals on the next write.',
     methods: [
+      {
+        signature: 'async forget(id: SessionId): Promise<void>',
+        description: 'Drop one Session\'s cached checkpoint rows. Physical deletion calls this so a removed Session leaves nothing behind and a later id cannot inherit the old rows.',
+        parameters: [{ name: 'id', description: 'the Session whose cached record is removed.' }],
+        returns: 'completion of the durable deletion.',
+      },
       {
         signature: 'cachedSnapshot( meta: SessionHeader, keys?: ProjectionKeySelection, ): ProjectionSnapshot | undefined',
         description: 'The zero-I/O listing read: whole values viewed straight from the stored rows (version-matching keys only) of the record bound to the caller\'s lifecycle. The header is the only identity witness a listing holds, so this face matches the lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`) and not the inherited cut: within one format generation the cut is fixed at fork time, so it distinguishes no lifecycle the other fields do not, and a viewed value never seeds a fold. The view is as stale as the last durable checkpoint but never wrong and never from an unrelated log. Its `asOfSeq` is the lowest watermark among the served rows: the stored record\'s own position, which the header cannot relate to the log the caller later opens. The Session list therefore labels the block as cached, and the client lets every value the connected Session produces supersede it whatever this number says.',
@@ -8844,6 +8862,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionCreateValue',
     declaration: 'export interface SessionCreateValue {\n    readonly sessionId: SessionId;\n    readonly agentPreset?: string;\n}',
+  },
+  {
+    name: 'SessionDeleteRequest',
+    declaration: 'export interface SessionDeleteRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionDeleteValue',
+    declaration: 'export interface SessionDeleteValue {\n    readonly deleted: boolean;\n}',
   },
   {
     name: 'SessionEndInput',

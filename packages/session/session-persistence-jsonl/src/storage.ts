@@ -422,6 +422,16 @@ export class JsonlBackendTracker {
   }
 
   /**
+   * Whether this process currently owns a write claim for the session,
+   * whether or not it has materialized yet.
+   * @param id - the session to query.
+   * @returns whether a create, open-write, or in-construction claim holds it.
+   */
+  hasWriter(id: SessionId): boolean {
+    return this.writers.has(id)
+  }
+
+  /**
    * Claim write ownership for an existing session.
    * @param id - the session to claim.
    * @throws {SessionAlreadyOwnedError} when an active write handle exists.

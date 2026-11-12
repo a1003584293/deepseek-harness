@@ -1,5 +1,6 @@
 /** Structured Session actions over the workspace owner's existing callbacks. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteEndpoint } from '@deepseek-ai/dsh-api-remote-access/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { MenuContribution, ContextMenuTargetMap } from '@deepseek-ai/dsh-client-ui-context-menu/client'
@@ -9,6 +10,14 @@ import type {
 
 type Actions = Omit<PinSessionInjected & ArchiveSessionInjected, 'hooks'>
   & ForkSessionInjected & RenameSessionInjected & SessionIdInjected
+  & {
+    /**
+     * Ask for the permanent-deletion confirmation.
+     * @param sessionId - Session to delete.
+     * @param displayTitle - title named in the confirmation.
+     */
+    requestSessionDelete(sessionId: SessionId, displayTitle: string): void
+  }
 
 /**
  * Register built-in actions while retaining the legacy Slot for external components.
@@ -56,6 +65,11 @@ export function registerSessionMenus(ctx: Context, actions: Actions): void {
     id: 'copy', label: t('menu.sessionId'), icon: { key: 'workspace.copy' }, separatorBefore: true,
     run: () => actions.copySessionId(target.sessionId),
   }])
+  register('delete', 700, ['session/delete'], target => allowed(target, 'session/delete') ? [{
+    id: 'delete', label: t('deleteSession.menu'), icon: { key: 'workspace.archive' },
+    danger: true, separatorBefore: true, afterContent: true,
+    run: () => { actions.requestSessionDelete(target.sessionId, target.displayTitle) },
+  }] : [])
   register('archive', 600, ['workspace/archiveSession', 'workspace/unarchiveSession'], (target) => {
     const restoring = archived(target)
     if (!allowed(target, restoring ? 'workspace/unarchiveSession' : 'workspace/archiveSession')) return []

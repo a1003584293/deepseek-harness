@@ -984,6 +984,15 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote('prompt') async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
 
 /**
+ * Permanently delete one stored Session and its durable log. A Session open
+ * in this process is refused: the caller must leave it first. Archived and
+ * pinned memberships are dropped so the identity does not linger.
+ * @param request - Session to delete.
+ * @returns whether any stored artifact was removed.
+ */
+@Remote('delete') async delete(request: SessionDeleteRequest): Promise<SessionDeleteValue>
+
+/**
  * Read one image from the attachment store after gateway authorization.
  * @param request - image reference and gateway permission scope; Session existence is not checked.
  * @returns the durable attachment reference and base64-encoded bytes.

@@ -420,6 +420,16 @@ abstract stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<S
  * @returns one snapshot per stored session.
  */
 abstract list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>
+
+/**
+ * Permanently delete every durable artifact this backend stores for one
+ * Session. Implementations that cannot remove stored logs omit the method,
+ * and callers must fail loudly rather than report a deletion.
+ * @param id - the stored Session to delete.
+ * @param options - optional cancellation.
+ * @returns whether any stored artifact was removed.
+ */
+remove?(id: SessionId, options?: { readonly signal?: AbortSignal }): Promise<boolean>
 ```
 
 Types: [SessionId](core.md)
