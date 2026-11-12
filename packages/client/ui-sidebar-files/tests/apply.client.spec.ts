@@ -40,6 +40,7 @@ interface Recorded {
 }
 
 const SESSION = 'files-session' as SessionId
+const HOME = '/Users/tester'
 const PANE = 'pane-1' as PaneId
 
 async function boot() {
@@ -94,7 +95,7 @@ async function boot() {
   ctx.provide('sidebarRightTabs', tabs as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
-  ctx.provide('remote', { workspaceFiles } as never)
+  ctx.provide('remote', { workspaceFiles, $host: { home: HOME, isLoopback: true } } as never)
   ctx.provide('remote.workspaceFiles', workspaceFiles as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
@@ -363,6 +364,12 @@ it('opens the quick palette from its shortcut and closes it on a second press', 
   expect(await injected.search('/tmp/x/gone.py', signal)).toEqual([])
   h.workspaceFiles.stat.mockRejectedValueOnce(new Error('offline'))
   expect(await injected.search('/tmp/x/offline.py', signal)).toEqual([])
+  // A home-rooted query expands to the Host home before the same absolute probe.
+  expect(injected.resolvePath('~/Desktop/CLAUDE.md')).toBe('/Users/tester/Desktop/CLAUDE.md')
+  h.workspaceFiles.stat.mockResolvedValueOnce({ ok: true, value: { absolutePath: '/Users/tester/Desktop/CLAUDE.md', version: 'v' } })
+  expect(await injected.search(injected.resolvePath('~/Desktop/CLAUDE.md'), signal)).toEqual([
+    { path: '/Users/tester/Desktop/CLAUDE.md', name: 'CLAUDE.md', directory: '/Users/tester/Desktop/' },
+  ])
   expect(h.workspaceFiles.search.mock.calls.length).toBe(searchCalls)
 })
 

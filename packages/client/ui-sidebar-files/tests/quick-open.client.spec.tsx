@@ -6,7 +6,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { QuickOpen } from '../src/client/QuickOpen.tsx'
 import type { QuickOpenProps } from '../src/client/QuickOpen.tsx'
-import { quickOpenEntry, rememberRecent, type RecentFiles } from '../src/client/quick-open.ts'
+import { quickOpenEntry, rememberRecent, expandQuickOpenPath, type RecentFiles } from '../src/client/quick-open.ts'
 
 afterEach(cleanup)
 
@@ -19,6 +19,7 @@ function palette(overrides: {
   recent?: RecentFiles
   sessionId?: SessionId | undefined
   open?: number | null
+  resolvePath?: QuickOpenProps['resolvePath']
   search?: QuickOpenProps['search']
 } = {}) {
   const opened = createSnapshotStore<number | null>(overrides.open === undefined ? 1 : overrides.open)
@@ -28,6 +29,7 @@ function palette(overrides: {
   )
   const close = vi.fn()
   const openFile = vi.fn()
+  const resolvePath = overrides.resolvePath ?? ((query: string) => query)
   const search = overrides.search ?? vi.fn(() => Promise.resolve([]))
   const props = {
     useOpen: (selector: (value: number | null) => unknown) => selector(opened.getSnapshot()),
@@ -35,6 +37,7 @@ function palette(overrides: {
     useMounted: (selector: (value: SessionId | undefined) => unknown) => selector(mounted.getSnapshot()),
     close,
     openFile,
+    resolvePath,
     search,
     t,
   } as unknown as QuickOpenProps
@@ -64,6 +67,18 @@ describe('recent file bookkeeping', () => {
       path: 'src/client/index.ts', name: 'index.ts', directory: 'src/client/',
     })
     expect(quickOpenEntry('README.md')).toEqual({ path: 'README.md', name: 'README.md', directory: '' })
+  })
+})
+
+describe('home-rooted paths', () => {
+  it('expands a leading tilde against the Host home', () => {
+    expect(expandQuickOpenPath('~/Desktop/CLAUDE.md', '/Users/smith')).toBe('/Users/smith/Desktop/CLAUDE.md')
+    expect(expandQuickOpenPath('~\\Desktop\\CLAUDE.md', 'C:\\Users\\smith')).toBe('C:\\Users\\smith/Desktop\\CLAUDE.md')
+    expect(expandQuickOpenPath('~', '/Users/smith')).toBe('/Users/smith')
+    // Without the ready frame's home, and for a name that only starts with a
+    // tilde, the query stays a workspace name search.
+    expect(expandQuickOpenPath('~/Desktop/CLAUDE.md', undefined)).toBe('~/Desktop/CLAUDE.md')
+    expect(expandQuickOpenPath('~backup/CLAUDE.md', '/Users/smith')).toBe('~backup/CLAUDE.md')
   })
 })
 
@@ -129,6 +144,20 @@ describe('QuickOpen', () => {
     await waitFor(() => { expect(search).toHaveBeenCalledWith('/tmp/does-not-exist.py', expect.any(AbortSignal)) })
     expect(screen.queryByText('quickOpen.empty')).toBeNull()
     expect(screen.queryAllByRole('option')).toHaveLength(0)
+  })
+
+  it('probes a home-rooted query as the absolute path it names', async () => {
+    const search = vi.fn(() => Promise.resolve([]))
+    palette({
+      recent: {},
+      search,
+      resolvePath: query => expandQuickOpenPath(query, '/Users/smith'),
+    })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '~/Desktop/CLAUDE.md' } })
+    await waitFor(() => {
+      expect(search).toHaveBeenCalledWith('/Users/smith/Desktop/CLAUDE.md', expect.any(AbortSignal))
+    })
+    expect(screen.queryByText('quickOpen.empty')).toBeNull()
   })
 
   it('drops an answer that arrives after the query changed', async () => {

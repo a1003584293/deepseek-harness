@@ -26,6 +26,13 @@ export interface QuickOpenInjected {
   /** Open one workspace-relative path in the right sidebar. */
   openFile: (path: string) => void
   /**
+   * Resolve query text to the Host path it names: a leading `~`, `~/`, or
+   * `~\` expands against the Host home directory.
+   * @param query - trimmed query text.
+   * @returns an absolute path when the query names one, otherwise the query unchanged.
+   */
+  resolvePath: (query: string) => string
+  /**
    * Resolve a query to rows: an absolute path names one file (present or not);
    * anything else searches the on-screen Session's workspace by name.
    * @param query - non-empty query text.
@@ -49,7 +56,7 @@ const EMPTY_ENTRIES: readonly QuickOpenEntry[] = []
  * @param props - the open sequence, recent paths, Session, and search/open actions.
  * @returns the palette while open, otherwise null.
  */
-export function QuickOpen({ useOpen, useRecent, useMounted, close, openFile, search, t }: QuickOpenProps): ReactNode {
+export function QuickOpen({ useOpen, useRecent, useMounted, close, openFile, resolvePath, search, t }: QuickOpenProps): ReactNode {
   const opened = useOpen(value => value)
   const recent = useRecent(value => value)
   const sessionId = useMounted(value => value)
@@ -57,6 +64,9 @@ export function QuickOpen({ useOpen, useRecent, useMounted, close, openFile, sea
   const [entries, setEntries] = useState<readonly QuickOpenEntry[]>(EMPTY_ENTRIES)
   const [active, setActive] = useState(0)
   const input = useRef<HTMLInputElement>(null)
+  // The typed text with a leading `~` already resolved to the Host home, so the
+  // absolute-path probe and the no-match state read one path.
+  const resolved = resolvePath(query.trim())
   // Each open starts from an empty query and the first row.
   useEffect(() => {
     if (opened === null) return
@@ -67,15 +77,14 @@ export function QuickOpen({ useOpen, useRecent, useMounted, close, openFile, sea
   }, [opened])
   useEffect(() => {
     if (opened === null || sessionId === undefined) return
-    const trimmed = query.trim()
-    if (trimmed === '') {
+    if (resolved === '') {
       setEntries((recent[sessionId] ?? []).map(quickOpenEntry))
       setActive(0)
       return
     }
     const controller = new AbortController()
     const timer = setTimeout(() => {
-      void search(trimmed, controller.signal).then((found) => {
+      void search(resolved, controller.signal).then((found) => {
         if (controller.signal.aborted) return
         setEntries(found)
         setActive(0)
@@ -85,11 +94,11 @@ export function QuickOpen({ useOpen, useRecent, useMounted, close, openFile, sea
       clearTimeout(timer)
       controller.abort()
     }
-  }, [opened, query, sessionId, recent, search])
+  }, [opened, resolved, sessionId, recent, search])
   if (opened === null || sessionId === undefined) return null
   // An absolute path has no empty state of its own: the row appears when the
   // path exists, and nothing is drawn when it does not.
-  const absolute = isAbsoluteWorkspacePath(query.trim())
+  const absolute = isAbsoluteWorkspacePath(resolved)
   const pick = (entry: QuickOpenEntry | undefined): void => {
     if (entry === undefined) return
     openFile(entry.path)

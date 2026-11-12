@@ -29,7 +29,7 @@ kind: "package-reference"
 
 命令 `workspace.files` 在焦点分栏内显示停靠预览旁的导航栏，或展开已有停靠文件页的搜索栏，并把键盘焦点移到其搜索框，保留该 tab；从聊天区触发时使用当前会话的活动停靠分栏。其他情况下（不带导航栏的 tab、没有工作目录的会话、浮动 tab）打开或聚焦文件页，文件页的目录树始终显示。文件页替换开始页，同一分栏内重复打开仍保留一个文件页。文件页已是当前标签时再按一次会关闭它；预览旁的导航栏正在显示时，再按一次会收起导航栏，而不是再次聚焦。桌面默认键为 Mod+Shift+E。开始页入口显示有效快捷键；Windows 和 macOS Web 使用[快捷键服务的平台默认值](../shortcuts/README.zh.md)；Linux Web 默认不绑定此命令。
 
-另一个命令 `workspace.quickOpen` 打开 VS Code 风格的快速打开面板：输入框为空时列出该会话最近打开的 30 个文件（最新在前，按会话保存在本地存储）；输入后经短暂防抖，用与文件页相同的 Host 搜索查询工作区，并列出匹配文件，显示叶子名与其工作区相对路径。↑/↓ 移动高亮并循环，Enter 打开高亮行，单击打开按下的行，Esc 或点击遮罩关闭面板。打开一行走正常的资源路由，因此标签与从目录树打开完全一致。桌面默认键为 Mod+P，Web 为 Mod+Alt+P（浏览器占用 Mod+P）；面板打开时该命令再次按下会关闭它。
+另一个命令 `workspace.quickOpen` 打开 VS Code 风格的快速打开面板：输入框为空时列出该会话最近打开的 30 个文件（最新在前，按会话保存在本地存储）；输入后经短暂防抖，用与文件页相同的 Host 搜索查询工作区，并列出匹配文件，显示叶子名与其工作区相对路径。输入单个路径时——绝对路径，或以 `~` 开头、展开为 Host 账户主目录的路径——改为通过 `remote.workspaceFiles.stat` 检查该路径，只有它是常规文件时才列出一行。↑/↓ 移动高亮并循环，Enter 打开高亮行，单击打开按下的行，Esc 或点击遮罩关闭面板。打开一行走正常的资源路由，因此标签与从目录树打开完全一致。桌面默认键为 Mod+P，Web 为 Mod+Alt+P（浏览器占用 Mod+P）；面板打开时该命令再次按下会关闭它。
 
 - **类型**：`ctx.sidebarRightTabs.register(...)`，kind 为 `files`，id 为 `@deepseek-ai/dsh-client-ui-sidebar-files`，档位 `builtin`，没有 patterns，另有一个打开该类型的引导页入口（order 10，标题与描述取自 `sidebarFiles` 命名空间，图标为黄色文件夹）。
 - **文件页正文**：以该 id 为键的 `sidebar.right.pane.tab` slot。其标题行横跨页面，通过共享的 [`PathLabel`](../ui-primitives/README.zh.md#component-catalog) 显示根路径，目录使用弱化颜色，最后一段使用主色；路径过长时保留尾部字符并在左侧渐隐，悬停显示完整路径。目录树的重新读取控件和搜索栏开关位于由文件页注册声明的 Session 作用域 `sidebar.right.tab.files.actions` 列表之前（通过 `absolutePath` 传入当前显示的根目录）；[`ui-open-in-app`](../ui-open-in-app/README.zh.md) 在此提供工作区目录打开按钮。标题行下方由该分栏的导航栏铺满整页，停靠与浮动时都一样，这里没有导航栏开关。

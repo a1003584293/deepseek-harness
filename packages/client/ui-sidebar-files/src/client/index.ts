@@ -28,7 +28,7 @@ import { FilesTitle } from './FilesTitle.tsx'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { NavigatorToggle } from './NavigatorToggle.tsx'
 import { QuickOpen, type QuickOpenInjected } from './QuickOpen.tsx'
-import { quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
+import { expandQuickOpenPath, quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
 import { createSearchPreferenceBook, SEARCH_PREFERENCES_KEY } from './search-preferences.ts'
 import { createFilesStore } from './store.ts'
 
@@ -260,6 +260,7 @@ export function apply(ctx: ClientContext): void {
       if (sessionId === undefined) return
       ctx.sidebarRight.openResource(sessionFileAddress(sessionId, path))
     },
+    resolvePath: query => expandQuickOpenPath(query, ctx.remote.$host.home),
     search: async (query, signal) => {
       const sessionId = ctx.sidebarRight.mounted.getSnapshot()
       if (sessionId === undefined) return []

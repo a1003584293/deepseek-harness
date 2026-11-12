@@ -45,3 +45,16 @@ export function quickOpenEntry(path: string): QuickOpenEntry {
   const cut = path.lastIndexOf('/') + 1
   return { path, name: path.slice(cut) || path, directory: path.slice(0, cut) }
 }
+
+/**
+ * Expand a leading `~`, `~/`, or `~\` against the Host home directory.
+ * @param query - trimmed query text.
+ * @param home - Host account home from the ready frame; absent leaves the query unchanged.
+ * @returns the absolute path the query names, otherwise the query unchanged.
+ */
+export function expandQuickOpenPath(query: string, home: string | undefined): string {
+  if (home === undefined || home === '') return query
+  if (query === '~') return home
+  if (!query.startsWith('~/') && !query.startsWith('~\\')) return query
+  return `${home.replace(/[/\\]+$/, '')}/${query.slice(2)}`
+}
