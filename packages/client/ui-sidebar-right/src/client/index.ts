@@ -52,6 +52,7 @@ import { createGuidePins } from './tabs/guide/guide-pins.ts'
 import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
+import { FileIndicator, type FileIndicatorInjected } from './file-indicator.tsx'
 
 export type { SidebarRightTarget } from './focus.ts'
 export type { RightbarSeatProps, SidebarRightInjected, SidebarRightPresentation } from './shell/SidebarRight.tsx'
@@ -61,6 +62,7 @@ export type { SidebarRightState, SurfaceState } from './stores.ts'
 export type {
   ISidebarRight, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
   SidebarRightPlacement, SidebarRightCloseHandler, SurfaceActions,
+  SidebarActiveFile, SidebarTextSelection,
 } from './service.ts'
 export type {
   SidebarRightGuideBox, SidebarRightGuideEntry, SidebarRightTabClaim, SidebarRightTabDefinition,
@@ -192,6 +194,44 @@ export function apply(ctx: ClientContext): void {
   }, 'ui-sidebar-right: service faces')
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-right: dictionaries')
+  // Cmd+. pins the code selection the document body published; the binding is
+  // user-editable through the shortcuts settings.
+  ctx.effect(() => ctx.shortcuts.register({
+    id: 'file.pinSelection' as ShortcutCommandId,
+    label: () => t('filePin.pinSelection'), aliases: ['pin selection', 'pin code selection'],
+    // Desktop only: Web reserves the bare primary+Period combination, and an
+    // unsupported Web default would fail this whole plugin's registration.
+    defaults: {
+      'desktop:macos': { code: 'Period', modifiers: ['meta'] },
+      'desktop:windows': { code: 'Period', modifiers: ['control'] },
+      'desktop:linux': { code: 'Period', modifiers: ['control'] },
+    },
+    regions: ['page'], modals: [],
+    resolve: ({ target }) => {
+      const focused = target === null ? undefined : ctx.sidebarRight.commandTarget(target)
+      const sessionId = focused?.sessionId ?? ctx.sidebarRight.mounted.getSnapshot()
+      if (sessionId === undefined) return { status: 'blocked', reason: t('filePin.noSession') }
+      const file = ctx.sidebarRight.activeFile.getSnapshot()
+      if (file === undefined || file.sessionId !== sessionId) return { status: 'blocked', reason: t('filePin.noFile') }
+      const { path, startLine, endLine } = file
+      if (startLine === undefined || endLine === undefined) {
+        return { status: 'blocked', reason: t('filePin.noSelection') }
+      }
+      return {
+        status: 'handled',
+        run: () => { ctx.get('inputPins')?.addReference(sessionId, { path, startLine, endLine }) },
+      }
+    },
+  }), 'ui-sidebar-right: pin selection shortcut')
+  ctx.effect(() => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'active-file',
+    locale: NS,
+    inject: (): FileIndicatorInjected => ({
+      hooks: { activeFile: ctx.sidebarRight.activeFile },
+      pin: (sessionId, reference) => ctx.get('inputPins')?.addReference(sessionId, reference) ?? false,
+    }),
+  }, FileIndicator)), 'ui-sidebar-right: composer file pin')
   ctx.effect(() => registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
     void ctx.shortcuts.closeWindow().catch((error: unknown) => { console.error('Window close failed', error) })
   }), 'ui-sidebar-right: shortcuts')

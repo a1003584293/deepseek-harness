@@ -20,7 +20,7 @@ export type FileCardState = 'uploading' | 'ready' | 'error'
 
 /** One pending file card: type glyph, name, size or upload status, remove, retry. */
 export function FileCard({
-  name, bytes, state, progress, labels, onRemove, onRetry,
+  name, bytes, state, progress, labels, onRemove, onRetry, meta: metaOverride, onOpen,
 }: {
   name: string
   bytes: number
@@ -29,13 +29,18 @@ export function FileCard({
   labels: FileCardLabels
   onRemove: () => void
   onRetry: () => void
+  /** Status line replacing the size/upload text, e.g. a pinned line range. */
+  meta?: string
+  /** Reveal the referenced file; a card without it keeps a static body. */
+  onOpen?: () => void
 }) {
   const extension = fileExtension(name).toUpperCase().slice(0, 8)
-  const meta = state === 'uploading'
+  const meta = metaOverride ?? (state === 'uploading'
     ? labels.uploading
     : state === 'error'
       ? labels.failed
-      : [extension, fileSizeText(bytes)].filter(part => part !== '').join(' ')
+      // A pinned reference card carries no bytes, so only its extension shows.
+      : [extension, bytes > 0 ? fileSizeText(bytes) : ''].filter(part => part !== '').join(' '))
   const retryable = state === 'error'
   return (
     <div
@@ -54,12 +59,19 @@ export function FileCard({
             <span className={`${css.meta} ${css.metaFailed}`}>{meta}</span>
           </button>
         )
-        : (
-          <span className={css.body} aria-label={labels.label}>
-            <span className={css.name}>{name}</span>
-            <span className={css.meta}>{meta}</span>
-          </span>
-        )}
+        : onOpen === undefined
+          ? (
+            <span className={css.body} aria-label={labels.label}>
+              <span className={css.name}>{name}</span>
+              <span className={css.meta}>{meta}</span>
+            </span>
+          )
+          : (
+            <button type="button" className={css.body} aria-label={labels.label} onClick={onOpen}>
+              <span className={css.name}>{name}</span>
+              <span className={css.meta}>{meta}</span>
+            </button>
+          )}
       <button
         type="button"
         className={retryable ? `${css.remove} ${css.removeFailed}` : css.remove}

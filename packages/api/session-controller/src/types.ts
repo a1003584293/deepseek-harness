@@ -72,6 +72,28 @@ export type SessionProjectionValues = Partial<SessionProjectionMap>
   & Readonly<Record<string, SessionProjectionValue>>
 
 /**
+ * One user-pinned path reference submitted with a prompt.
+ */
+export interface SessionFileReferencePart {
+  readonly type: 'file-reference'
+  /** Session-workspace-relative or absolute `/`-separated path. */
+  readonly path: string
+  /** First selected line, 1-based; present only with `endLine`. */
+  readonly startLine?: number
+  /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+  readonly endLine?: number
+}
+
+/** One user-pinned terminal selection submitted with a prompt. */
+export interface SessionTerminalSelectionPart {
+  readonly type: 'terminal-selection'
+  /** Selected terminal text, verbatim. */
+  readonly text: string
+  /** Working directory the selection was captured in, when known. */
+  readonly cwd?: string
+}
+
+/**
  * Browser-submitted prompt content; the Host promotes image bytes to durable
  * references. File parts carry the opaque receipt returned by a preceding
  * upload on the same Session; the receipt of an image upload enters the
@@ -86,6 +108,8 @@ export type PromptContentPart =
     readonly name?: string
   }
   | { readonly type: 'file'; readonly receiptId: Branded<'file-upload-receipt-id'> }
+  | SessionFileReferencePart
+  | SessionTerminalSelectionPart
 
 /** Request to permanently delete one stored Session. */
 export interface SessionDeleteRequest {

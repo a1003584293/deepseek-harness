@@ -73,7 +73,5 @@ export function fileCardLabels(t: TranslateNS<'conversation'>, name: string): Fi
 export function attachmentRailLabels(t: TranslateNS<'conversation'>): AttachmentRailLabels {
   return {
     group: t('attachment.pending'),
-    scrollLeft: t('attachment.scrollLeft'),
-    scrollRight: t('attachment.scrollRight'),
   }
 }

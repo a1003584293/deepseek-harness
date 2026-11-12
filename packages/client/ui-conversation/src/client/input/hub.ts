@@ -21,6 +21,7 @@ import type {
   SessionInputResolver, SessionInput, SubmitOutcome,
 } from '../contract/input.ts'
 import type { ComposerKeyboard } from '../contract/draft-editor.ts'
+import type { ComposerAttachment } from '../contract/slots.ts'
 import type { ComposerBlocks } from '../contract/composer-blocks.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
@@ -51,6 +52,8 @@ interface ConversationAttachmentFace {
     accept?: () => void,
   ): Promise<SubmitOutcome>
   serializeDraftAttachments(attachmentIds: readonly DraftAttachmentId[]): Promise<DraftAttachmentSerializationResult>
+  addReference(reference: { readonly path: string; readonly startLine?: number; readonly endLine?: number }): ComposerAttachment
+  addTerminalSelection(selection: { readonly text: string; readonly cwd?: string }): ComposerAttachment
   releaseDraftAttachment(id: DraftAttachmentId): void
 }
 
@@ -247,6 +250,40 @@ export class InputHub implements SessionInputResolver {
   pickFiles(id: SessionId): void {
     const binding = this.sessions().binding(id)
     if (binding !== undefined) this.shells.get(binding)?.pickFiles()
+  }
+
+  /**
+   * Add one pinned path reference to a Session's composer.
+   * @param id - target Session.
+   * @param reference - path with an optional 1-based line range.
+   * @returns whether the composer accepted it.
+   */
+  addReference(id: SessionId, reference: {
+    readonly path: string
+    readonly startLine?: number
+    readonly endLine?: number
+  }): boolean {
+    return this.pinDraft(id, () => this.conversation().addReference(reference))
+  }
+
+  /**
+   * Add one pinned terminal selection to a Session's composer.
+   * @param id - target Session.
+   * @param selection - selected text and its capture directory.
+   * @returns whether the composer accepted it.
+   */
+  addTerminalSelection(id: SessionId, selection: { readonly text: string; readonly cwd?: string }): boolean {
+    return this.pinDraft(id, () => this.conversation().addTerminalSelection(selection))
+  }
+
+  private pinDraft(id: SessionId, create: () => ComposerAttachment): boolean {
+    const binding = this.sessions().binding(id)
+    if (binding === undefined) return false
+    const attachment = create()
+    const shell = this.shellFor(binding)
+    if (shell.addAttachments([attachment.id])) return true
+    this.conversation().releaseDraftAttachment(attachment.id)
+    return false
   }
 
   /**

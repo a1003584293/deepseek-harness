@@ -27,7 +27,7 @@ function codeProps(h: ReturnType<typeof harness>): TextPreviewProps {
   return {
     ...props,
     useDocumentPreviews: selector => selector([definition]),
-    renderSlot: documentSlots((_key, owner) => <CodeBody {...props} {...owner as unknown as OwnerOf<'sidebar.right.tab.document'>} t={key => key} />),
+    renderSlot: documentSlots((_key, owner) => <CodeBody {...props} {...owner as unknown as OwnerOf<'sidebar.right.tab.document'>} reportSelection={() => {}} clearSelection={() => {}} t={key => key} />),
   }
 }
 

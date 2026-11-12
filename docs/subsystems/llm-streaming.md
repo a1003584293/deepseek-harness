@@ -25,6 +25,8 @@ interface ContentBlockMap {
   'reasoning': ReasoningBlock
   'image': ImageBlock
   'file': FileBlock
+  'file-reference': FileReferenceBlock
+  'terminal-selection': TerminalSelectionBlock
   'tool-call': ToolCallBlock
   'tool-addition': ToolAdditionBlock
   'tool-removal': ToolRemovalBlock

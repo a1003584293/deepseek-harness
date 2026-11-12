@@ -69,6 +69,39 @@ export function hasPromptContent(content: readonly PromptContentCandidate[]): bo
 }
 
 /**
+ * Reject a pinned reference the log could not represent or render.
+ * @param content - submitted or edited prompt parts.
+ * @throws RemoteError when a path reference carries a blank path or an incomplete
+ * or unordered line range, or a terminal selection carries blank text.
+ */
+export function assertPromptReferences(content: readonly PromptContentCandidate[]): void {
+  for (const part of content) {
+    if (part.type === 'terminal-selection') {
+      if (part.text.trim() === '') {
+        throw new RemoteError(
+          'gateway/bad-request',
+          'terminal-selection content requires non-empty selected text',
+          {},
+        )
+      }
+      continue
+    }
+    if (part.type !== 'file-reference') continue
+    const { path, startLine, endLine } = part
+    const paired = (startLine === undefined) === (endLine === undefined)
+    const ordered = startLine === undefined || endLine === undefined
+      || (Number.isSafeInteger(startLine) && Number.isSafeInteger(endLine) && startLine >= 1 && endLine >= startLine)
+    if (path.trim() === '' || !paired || !ordered) {
+      throw new RemoteError(
+        'gateway/bad-request',
+        'file-reference content requires a non-empty path and an ordered 1-based line range',
+        {},
+      )
+    }
+  }
+}
+
+/**
  * Resolve the omitted-`atSeq` default to the latest completed-turn prefix,
  * including standalone events before the next turn begins.
  */

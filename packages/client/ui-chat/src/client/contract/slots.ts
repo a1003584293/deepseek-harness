@@ -252,6 +252,26 @@ export interface ChatNodeOwnerProps {
 export type UserContentAttachment =
   | { readonly type: 'image'; readonly image: MessageImageSource }
   | { readonly type: 'file'; readonly file: FileAttachmentRef }
+  | {
+    readonly type: 'reference'
+    readonly reference: {
+      /** Session-workspace-relative or absolute path. */
+      readonly path: string
+      /** First selected line, 1-based; present only with `endLine`. */
+      readonly startLine?: number
+      /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+      readonly endLine?: number
+    }
+  }
+  | {
+    readonly type: 'terminal'
+    readonly terminal: {
+      /** Selected terminal text, verbatim. */
+      readonly text: string
+      /** Working directory the selection was captured in, when known. */
+      readonly cwd?: string
+    }
+  }
 
 /** Prepared user contents without row identity, admission state, time, or actions. */
 export interface UserContentData {
@@ -267,6 +287,8 @@ export interface UserContentData {
 export interface UserContentInput extends Pick<ChatNodeOwnerProps, 'loadImage'>,
   Pick<UserTextInput, 'interactive' | 'ellipsis'> {
   readonly content: UserContentData
+  /** File navigation for pinned reference cards; absent leaves the cards inert. */
+  readonly openFile?: ChatNodeOwnerProps['openFile']
   /** Transform inputs passed unchanged to UserText, separate from summary and rendering props. */
   readonly facts: Readonly<Partial<UserTextFacts>>
 }

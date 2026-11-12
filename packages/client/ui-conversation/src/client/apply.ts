@@ -301,6 +301,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
   })
 
   const inputHub = new InputHub(ctx, t)
+  ctx.provide('inputPins', {
+    addReference: (sessionId, reference) => inputHub.addReference(sessionId, reference),
+    addTerminalSelection: (sessionId, selection) => inputHub.addTerminalSelection(sessionId, selection),
+  })
   const composerBlocks = new ComposerBlockRegistry()
 
   ctx.inject(['commandUi'], (scope) => {

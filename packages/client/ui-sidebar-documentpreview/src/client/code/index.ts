@@ -2,7 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { CODE_HIGHLIGHT_EXTENSIONS } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '../index.ts'
-import { CodeBody } from './CodeBody.tsx'
+import { CodeBody, type CodeBodyInjected } from './CodeBody.tsx'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 
 const ID = '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/code'
@@ -22,6 +22,19 @@ export function apply(ctx: Context): void {
     sourceLines: true,
   }))
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.document', () => ctx.slots.register(
-    { name: 'sidebar.right.tab.document', key: ID, locale: NS }, CodeBody,
+    {
+      name: 'sidebar.right.tab.document',
+      key: ID,
+      locale: NS,
+      // Reported through the optional right-Sidebar face: a preview still
+      // renders when the dock is absent from this composition.
+      inject: (): CodeBodyInjected => ({
+        reportSelection: (selection) => { ctx.get('sidebarRight')?.setTextSelection(selection) },
+        clearSelection: (selection) => {
+          ctx.get('sidebarRight')?.clearTextSelection(selection.sessionId, selection.address)
+        },
+      }),
+    },
+    CodeBody,
   )))
 }

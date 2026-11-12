@@ -773,7 +773,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PendingSubmissionAttachment',
-    declaration: 'export type PendingSubmissionAttachment = PendingSubmissionImageAttachment | PendingSubmissionFileAttachment;',
+    declaration: 'export type PendingSubmissionAttachment = PendingSubmissionImageAttachment | PendingSubmissionFileAttachment | PendingSubmissionReferenceAttachment | PendingSubmissionTerminalAttachment;',
   },
   {
     name: 'PendingSubmissionFileAttachment',
@@ -792,8 +792,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type PendingSubmissionPlacement = \'transcript\' | \'queued\' | \'steering\';',
   },
   {
+    name: 'PendingSubmissionReferenceAttachment',
+    declaration: 'export interface PendingSubmissionReferenceAttachment {\n    readonly type: \'file-reference\';\n    readonly value: {\n        readonly path: string;\n        readonly startLine?: number;\n        readonly endLine?: number;\n    };\n}',
+  },
+  {
     name: 'PendingSubmissionRetirement',
     declaration: 'export type PendingSubmissionRetirement = {\n    readonly reason: \'observed\';\n    readonly attachments: readonly (ImageAttachmentRef | FileAttachmentRef)[];\n} | {\n    readonly reason: \'failed\';\n};',
+  },
+  {
+    name: 'PendingSubmissionTerminalAttachment',
+    declaration: 'export interface PendingSubmissionTerminalAttachment {\n    readonly type: \'terminal-selection\';\n    readonly value: {\n        readonly text: string;\n        readonly cwd?: string;\n    };\n}',
   },
   {
     name: 'ProjectionsFace',
@@ -801,7 +809,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptContentPart',
-    declaration: 'export type PromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly mediaType: ImageMediaType;\n    readonly data: string;\n    readonly name?: string;\n} | {\n    readonly type: \'file\';\n    readonly receiptId: Branded<\'file-upload-receipt-id\'>;\n};',
+    declaration: 'export type PromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly mediaType: ImageMediaType;\n    readonly data: string;\n    readonly name?: string;\n} | {\n    readonly type: \'file\';\n    readonly receiptId: Branded<\'file-upload-receipt-id\'>;\n} | SessionFileReferencePart | SessionTerminalSelectionPart;',
   },
   {
     name: 'PromptError',
@@ -916,6 +924,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SessionFace = ISession & ObservableSnapshot<SessionSnapshot>;',
   },
   {
+    name: 'SessionFileReferencePart',
+    declaration: 'export interface SessionFileReferencePart {\n    readonly type: \'file-reference\';\n    readonly path: string;\n    readonly startLine?: number;\n    readonly endLine?: number;\n}',
+  },
+  {
     name: 'SessionIdOf',
     declaration: 'export type SessionIdOf = SessionStandardProps extends {\n    sessionId: infer S;\n} ? S : string;',
   },
@@ -978,6 +990,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionTarget',
     declaration: 'export type SessionTarget = SessionId | SubagentAddress;',
+  },
+  {
+    name: 'SessionTerminalSelectionPart',
+    declaration: 'export interface SessionTerminalSelectionPart {\n    readonly type: \'terminal-selection\';\n    readonly text: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'SlotComponent',

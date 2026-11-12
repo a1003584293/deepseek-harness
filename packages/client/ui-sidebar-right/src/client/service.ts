@@ -40,6 +40,7 @@ import type { FloatRect, LayoutState, PaneId, TabId, TabRecord } from '@deepseek
 import { activeDockPaneId, canSplit, findContentTab, findPaneContentTab, dockPaneIds, findTabPane, getPane } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type { SidebarRightNavigationParams, SidebarRightResourceParams, SidebarRightTabParamsFor } from './contract/params.ts'
 import { pageAddress } from './contract/seed.ts'
 import type { SidebarRightDestination } from './contract/slots.ts'
@@ -110,7 +111,10 @@ export function createSidebarRightController(tabs: SidebarRightTabRegistry, pin:
       rooms.delete(sessionId)
       flashes.delete(sessionId)
     },
-    show: (sessionId) => { if (onScreen.getSnapshot() !== sessionId) onScreen.set(sessionId) },
+    show: (sessionId) => {
+      if (onScreen.getSnapshot() !== sessionId) onScreen.set(sessionId)
+      if (sessionId !== undefined) controller.refreshActiveFile(sessionId)
+    },
     measure: (sessionId, canSplitPane) => { rooms.set(sessionId, canSplitPane) },
     adopt(sessionId, store) {
       adopted.get(sessionId)?.unsubscribe()
@@ -118,6 +122,7 @@ export function createSidebarRightController(tabs: SidebarRightTabRegistry, pin:
         const surface = store.getSnapshot().bySession[sessionId]
         inventory.update(sessionId, Object.values(surface?.layout.tabs ?? {}))
         if (surface !== undefined) controller.tabDomain.sync(sessionId, surface.layout)
+        controller.refreshActiveFile(sessionId)
       }
       const adoption: Adoption = { store, unsubscribe: store.subscribe(sync) }
       adopted.set(sessionId, adoption)
@@ -207,6 +212,35 @@ const RESOURCE_SCHEME = 'dsh-resource://'
 export interface SidebarRightFlash {
   readonly paneId: PaneId
   readonly serial: number
+}
+
+/** The file addressed by a Session's focused Sidebar tab, with an optional published line range. */
+export interface SidebarActiveFile {
+  readonly sessionId: SessionId
+  /** The tab's `dsh-resource://file/…` address. */
+  readonly address: string
+  /** Session-workspace-relative or absolute path parsed from the address. */
+  readonly path: string
+  /** First selected line, 1-based; present only with `endLine`. */
+  readonly startLine?: number
+  /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+  readonly endLine?: number
+}
+
+/** One text selection published by a mounted document body. */
+export interface SidebarTextSelection {
+  readonly sessionId: SessionId
+  readonly address: string
+  readonly startLine: number
+  readonly endLine: number
+}
+
+/** Identity comparison for two published active-file snapshots. */
+function sameActiveFile(left: SidebarActiveFile | undefined, right: SidebarActiveFile | undefined): boolean {
+  if (left === right) return true
+  if (left === undefined || right === undefined) return false
+  return left.sessionId === right.sessionId && left.address === right.address
+    && left.startLine === right.startLine && left.endLine === right.endLine
 }
 
 /** Synchronous close/replacement hook; resource owners retain any background cleanup. */
@@ -303,6 +337,11 @@ export class SidebarRightController implements ISidebarRight {
   readonly openTabs: SidebarTabInventory['source']
   /** The on-screen Session; see {@link ISidebarRight.mounted}. */
   readonly mounted: ObservableSnapshot<SessionId | undefined>
+  /** The file addressed by the focused tab of the last committed layout, with its published line range. */
+  readonly activeFile: SnapshotStore<SidebarActiveFile | undefined> =
+    createSnapshotStore<SidebarActiveFile | undefined>(undefined)
+  private readonly textSelection: SnapshotStore<SidebarTextSelection | undefined> =
+    createSnapshotStore<SidebarTextSelection | undefined>(undefined)
   private readonly adopted: ReadonlyMap<SessionId, Adoption>
   private readonly rooms: ReadonlyMap<SessionId, RoomRule>
   private readonly closeHandlers = new Map<string, SidebarRightCloseHandler>()
@@ -344,6 +383,60 @@ export class SidebarRightController implements ISidebarRight {
     this.openTabs = sessions.openTabs
     this.flashes = sessions.flashes
     this.tabDomain = new TabDomain(this, pin)
+  }
+
+  /**
+   * Record the latest text selection a document body published, then refresh
+   * the active file so a range reaches the composer indicator.
+   * @param selection - the selection, or undefined when the body cleared it.
+   */
+  setTextSelection(selection: SidebarTextSelection | undefined): void {
+    const current = this.textSelection.getSnapshot()
+    if (current === selection || (current !== undefined && selection !== undefined
+      && current.sessionId === selection.sessionId && current.address === selection.address
+      && current.startLine === selection.startLine && current.endLine === selection.endLine)) return
+    this.textSelection.set(selection)
+    // Clearing refreshes the Session that owned the previous range.
+    const sessionId = selection?.sessionId ?? current?.sessionId
+    if (sessionId !== undefined) this.refreshActiveFile(sessionId)
+  }
+
+  /**
+   * Clear the published selection only when it belongs to the reporting body,
+   * so a sibling body's `selectionchange` cannot wipe another tab's range.
+   * @param sessionId - Session owning the address.
+   * @param address - the reporting body's resource address.
+   */
+  clearTextSelection(sessionId: SessionId, address: string): void {
+    const current = this.textSelection.getSnapshot()
+    if (current === undefined || current.sessionId !== sessionId || current.address !== address) return
+    this.setTextSelection(undefined)
+  }
+
+  /**
+   * Recompute the file addressed by a Session's focused tab. Called after every
+   * layout commit and after a selection change.
+   * @param sessionId - the adopted Session whose layout last committed.
+   */
+  refreshActiveFile(sessionId: SessionId): void {
+    const layout = this.adopted.get(sessionId)?.store.getSnapshot().bySession[sessionId]?.layout
+    const pane = layout === undefined ? undefined : layout.nodes[layout.activePaneId]
+    const tabId = pane?.kind === 'pane' ? pane.activeTabId : undefined
+    const occurrence = tabId === undefined ? undefined : this.tabDomain.occurrence(sessionId, { id: tabId })
+    const address = occurrence?.navigation.getSnapshot().address
+    const parsed = address === undefined ? undefined : parseFileAddress(address)
+    const selection = this.textSelection.getSnapshot()
+    const range = parsed !== undefined && selection !== undefined
+      && selection.sessionId === sessionId && selection.address === address
+      ? selection
+      : undefined
+    const next: SidebarActiveFile | undefined = parsed === undefined ? undefined : {
+      sessionId,
+      address: address as string,
+      path: parsed.path,
+      ...range === undefined ? {} : { startLine: range.startLine, endLine: range.endLine },
+    }
+    if (!sameActiveFile(this.activeFile.getSnapshot(), next)) this.activeFile.set(next)
   }
 
   /**

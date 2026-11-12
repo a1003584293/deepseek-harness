@@ -108,6 +108,35 @@ export interface FileBlock {
   attachment: FileAttachmentRef
 }
 
+/**
+ * A user-pinned reference to a file path, optionally limited to a line range.
+ * The block carries no bytes: the durable log keeps the reference for
+ * presentation and authorization, and request assembly projects it to path
+ * and range text the model reads on demand.
+ */
+export interface FileReferenceBlock {
+  type: 'file-reference'
+  /** Session-workspace-relative or absolute `/`-separated path. */
+  path: string
+  /** First selected line, 1-based; present only with `endLine`. */
+  startLine?: number
+  /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+  endLine?: number
+}
+
+/**
+ * One user-pinned terminal selection. The block carries the selected text
+ * verbatim; request assembly wraps it in a `<terminal_selection>` element the
+ * model reads as recorded output rather than instructions.
+ */
+export interface TerminalSelectionBlock {
+  type: 'terminal-selection'
+  /** Selected terminal text, verbatim. */
+  text: string
+  /** Working directory the selection was captured in, when known. */
+  cwd?: string
+}
+
 /** A tool invocation requested by the model. */
 export interface ToolCallBlock {
   type: 'tool-call'
@@ -146,6 +175,8 @@ export interface ContentBlockMap {
   'reasoning': ReasoningBlock
   'image': ImageBlock
   'file': FileBlock
+  'file-reference': FileReferenceBlock
+  'terminal-selection': TerminalSelectionBlock
   'tool-call': ToolCallBlock
   'tool-addition': ToolAdditionBlock
   'tool-removal': ToolRemovalBlock

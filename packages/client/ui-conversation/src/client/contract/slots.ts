@@ -33,7 +33,8 @@ declare module '@deepseek-ai/dsh-client-ui-context-menu/client' {
 }
 
 /** Browser-owned draft attachment that has not crossed the durable Host boundary. */
-export type ComposerAttachment = ComposerImageAttachment | ComposerFileAttachment
+export type ComposerAttachment = ComposerImageAttachment | ComposerFileAttachment | ComposerReferenceAttachment
+  | ComposerTerminalAttachment
 
 /**
  * Browser-owned image. An ordinary Session's draft uploads it to the Host as
@@ -56,6 +57,31 @@ export interface ComposerFileAttachment {
   kind: 'file'
   id: DraftAttachmentId
   file: File
+}
+
+/**
+ * Browser-owned path reference: a pinned file or line range sent as a
+ * structured content block, never uploaded and never copied into the store.
+ */
+export interface ComposerReferenceAttachment {
+  kind: 'reference'
+  id: DraftAttachmentId
+  /** Session-workspace-relative or absolute `/`-separated path. */
+  path: string
+  /** First selected line, 1-based; present only with `endLine`. */
+  startLine?: number
+  /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+  endLine?: number
+}
+
+/** Browser-owned terminal selection pinned as a structured content block. */
+export interface ComposerTerminalAttachment {
+  kind: 'terminal'
+  id: DraftAttachmentId
+  /** Selected terminal text, verbatim. */
+  text: string
+  /** Working directory the selection was captured in, when known. */
+  cwd?: string
 }
 
 /**

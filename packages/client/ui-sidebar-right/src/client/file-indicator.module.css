@@ -1,0 +1,43 @@
+/* Match the composer card's box: the stack spans the full column while the
+   card sits inside the composer's side clearance and max width, so replicating
+   both keeps the chip's left edge on the card's left edge. */
+.row {
+  display: flex;
+  justify-content: flex-start;
+  width: min(calc(100% - 2 * var(--dsh-composer-side-clearance, 16px)), var(--dsh-composer-card-max-width, 100%));
+  margin: 0 auto;
+  padding: 0 0 6px;
+  box-sizing: border-box;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(420px, 70%);
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-specific-input-major, transparent);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.range {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}

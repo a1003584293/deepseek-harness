@@ -83,7 +83,7 @@ export { ConversationViewRegistry } from './conversation/view-registry.ts'
 export type { ConversationKey } from './locales.ts'
 export type {
   ComposerAttachment, ComposerAttachmentsOwnerProps, ComposerAttachmentsProps,
-  ComposerFileAttachment, ComposerImageAttachment, DraftFileUpload, DraftFileUploads,
+  ComposerFileAttachment, ComposerImageAttachment, ComposerReferenceAttachment, DraftFileUpload, DraftFileUploads,
   ComposerBarInjected, ComposerBarOwnerProps, ComposerBarProps, ComposerChainProps,
   ConversationHeaderActionOwnerProps, ConversationHeaderCornerOwnerProps, ConversationHeaderLineageOwnerProps,
   ConversationContentInputProps, ConversationContentProps,
@@ -112,8 +112,12 @@ declare module '@deepseek-ai/cordis' {
     conversation: import('./service.ts').IConversation
     /** Target-neutral Conversation registries and per-Session assembly. */
     uiConversation: import('./conversation/assembly.ts').UiConversation
+    /** Composer pin affordances addressed by Session id. */
+    inputPins: import('./input-pins.ts').InputPins
   }
 }
+
+export type { InputPins, PinReference, PinTerminalSelection } from './input-pins.ts'
 
 export type { TextInteractionDefinition, TextInteractionGesture, TextInteractionRequest, TextInteractionSurface, TextInteractionTrigger } from './contract/text-interaction.ts'
 export type { ConversationInteractionRegistry } from './conversation/interaction-registry.ts'

@@ -31,7 +31,7 @@ Mount this plugin alongside [`ui-conversation`](../ui-conversation/README.md) an
 
 ### Draft attachments
 
-Images and generic files retain pick order in one non-wrapping horizontal rail. Every item is 64px high: an image is a 64px square thumbnail, while a generic file is a 240px-wide DeepSeek Web card with a 16px radius, blue gradient document glyph, filename, and uppercase extension plus byte size. Edge arrows page hidden overflow, the scrollbar stays hidden, and a newly added item is revealed at the rail's end. Uploading replaces a file glyph with a spinner and shows byte progress when the carrier reports it, with an indeterminate bar before the first report; failure shows retry, and removal controls appear on hover or keyboard focus while remaining visible on touch devices. An uploading image shows the same progress bar along its thumbnail's bottom edge, and a failed image upload turns the thumbnail into its retry control, except an image the Host refused, whose thumbnail explains the refusal in a tooltip that a tap or click also pins and leaves removal as the way out. Clicking an image opens the original.
+Images, generic files, and pinned references retain pick order in one wrapping rail. Images and generic files are 64px high: an image is a 64px square thumbnail, while a generic file is a 240px-wide DeepSeek Web card with a 16px radius, blue gradient document glyph, filename, and uppercase extension plus byte size; a pinned reference is a 28px chip with its leaf filename and line range. Items keep their intrinsic width and wrap onto additional rows instead of scrolling horizontally, so no attachment is hidden behind a paging control. Uploading replaces a file glyph with a spinner and shows byte progress when the carrier reports it, with an indeterminate bar before the first report; failure shows retry, and removal controls appear on hover or keyboard focus while remaining visible on touch devices. An uploading image shows the same progress bar along its thumbnail's bottom edge, and a failed image upload turns the thumbnail into its retry control, except an image the Host refused, whose thumbnail explains the refusal in a tooltip that a tap or click also pins and leaves removal as the way out. Clicking an image opens the original.
 
 ### Message images and the lightbox
 
@@ -61,7 +61,7 @@ The plugin provides the root-scoped `conversation.images.content` Factory. Its o
 |---|---|
 | [`src/client/ComposerAttachments.tsx`](src/client/ComposerAttachments.tsx) | Ordered image/file rail + drop overlay assembly |
 | [`src/client/drop-events.ts`](src/client/drop-events.ts) | Document drag-and-drop listeners installed by each mounted attachment view's effect |
-| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | Horizontal attachment overflow, wheel translation, edge arrows |
+| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | Wrapping attachment rows |
 | [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | Per-message gallery + lightbox assembly |
 | [`src/MessageImage.tsx`](src/MessageImage.tsx) | Single image sizing, load/retry, click-to-open; local submission-echo previews render their object URL directly |
 | [`ImageLightbox`](../ui-primitives/src/ImageLightbox.tsx) | Document-level modal preview over the shared mask |

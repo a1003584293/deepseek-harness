@@ -358,3 +358,36 @@
   font-size: 12px;
   line-height: 15px;
 }
+
+.referenceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-specific-input-major, transparent);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.referenceChip:hover {
+  border-color: var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.referenceIcon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.referenceName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type {
   ComposerAttachment, ComposerAttachmentsProps, ComposerImageAttachment,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
-  IconCloseFillRegular, IconRefreshOutlineRegular, IconWarningOutlineRegular, Tooltip,
+  FileTypeIcon, IconCloseFillRegular, IconRefreshOutlineRegular, IconWarningOutlineRegular, PluginArtworkTerminal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { AttachmentRail } from '../AttachmentRail.tsx'
 import type { AttachmentRailItem } from '../AttachmentRail.tsx'
@@ -29,6 +29,35 @@ export interface ComposerAttachmentsInjected {
 type ComposerAttachmentsInput = Pick<ComposerAttachmentsProps,
   | 'attachments' | 'canAcceptDrop' | 'onAddFiles' | 'onRemoveAttachment' | 'uploads' | 'onRetryFile'
   | 'uploadFailureText' | 'dropLimits' | 't'>
+
+/** Leaf filename shown on a pinned-reference card. */
+function referenceName(path: string): string {
+  return path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1) || path
+}
+
+/** Pinned line range shown under the leaf filename. */
+function referenceMeta(startLine?: number, endLine?: number): string | undefined {
+  return startLine === undefined || endLine === undefined ? undefined : `${startLine}-${endLine}`
+}
+
+/** Compact chip for a pinned reference; it carries no upload state or byte size. */
+function DraftChip({ icon, label, title, removeLabel, onRemove }: {
+  icon: ReactNode
+  label: string
+  title?: string | undefined
+  removeLabel: string
+  onRemove: () => void
+}) {
+  return (
+    <span className={css.draftChip} title={title}>
+      <span className={css.draftChipIcon} aria-hidden>{icon}</span>
+      <span className={css.draftChipLabel}>{label}</span>
+      <button type="button" className={css.draftChipRemove} aria-label={removeLabel} onClick={onRemove}>
+        <IconCloseFillRegular size={12} />
+      </button>
+    </span>
+  )
+}
 
 /** Draft image previews, pending-file cards, drop target, and original-image preview. */
 export function ComposerAttachments({
@@ -66,6 +95,31 @@ export function ComposerAttachments({
             labels={attachmentRailLabels(t)}
             renderItem={(item) => {
               const attachment = item.attachment
+              if (attachment.kind === 'terminal') {
+                const name = t('file.terminalName')
+                return (
+                  <DraftChip
+                    icon={<PluginArtworkTerminal size={14} />}
+                    label={`${name} · ${t('file.terminalRange', { lines: attachment.text.split('\n').length })}`}
+                    title={attachment.cwd}
+                    removeLabel={t('file.remove', { name })}
+                    onRemove={() => { onRemoveAttachment(attachment.id) }}
+                  />
+                )
+              }
+              if (attachment.kind === 'reference') {
+                const name = referenceName(attachment.path)
+                const meta = referenceMeta(attachment.startLine, attachment.endLine)
+                return (
+                  <DraftChip
+                    icon={<FileTypeIcon path={attachment.path} size={14} />}
+                    label={meta === undefined ? name : `${name} ${meta}`}
+                    title={attachment.path}
+                    removeLabel={t('file.remove', { name })}
+                    onRemove={() => { onRemoveAttachment(attachment.id) }}
+                  />
+                )
+              }
               if (attachment.kind === 'file') {
                 const upload = uploads[attachment.id]
                 return (

@@ -46,6 +46,11 @@ export const zh = {
   'tab.guide.title': '开始',
   'tab.guide.more': '更多工具',
   'tab.unavailable': '这类内容还没有可用的查看方式。',
+  'filePin.pin': '钉到输入框：{path}',
+  'filePin.pinSelection': '钉住选中代码',
+  'filePin.noSession': '请先选择会话',
+  'filePin.noFile': '当前没有打开的文件',
+  'filePin.noSelection': '请先在代码中选中若干行',
 } satisfies Record<string, string>
 
 /** Right-Sidebar dictionary key union. */
@@ -91,6 +96,11 @@ export const en = {
   'tab.guide.title': 'Start',
   'tab.guide.more': 'More tools',
   'tab.unavailable': 'Nothing here can view this kind of content yet.',
+  'filePin.pin': 'Pin to composer: {path}',
+  'filePin.pinSelection': 'Pin selected code',
+  'filePin.noSession': 'Select a session first',
+  'filePin.noFile': 'No file is open',
+  'filePin.noSelection': 'Select some code lines first',
 } satisfies Record<SidebarRightKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -133,6 +143,11 @@ export const ja = {
   'tab.guide.title': '開始',
   'tab.guide.more': 'その他のツール',
   'tab.unavailable': 'この種類のコンテンツを表示できるものはまだありません。',
+  'filePin.pin': '入力欄に固定：{path}',
+  'filePin.pinSelection': '選択したコードを固定',
+  'filePin.noSession': '先にセッションを選択してください',
+  'filePin.noFile': '開いているファイルがありません',
+  'filePin.noSelection': '先にコードの行を選択してください',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -175,6 +190,11 @@ export const es = {
   'tab.guide.title': 'Empezar',
   'tab.guide.more': 'Más herramientas',
   'tab.unavailable': 'Nada aquí puede ver este tipo de contenido todavía.',
+  'filePin.pin': 'Fijar al cuadro de entrada: {path}',
+  'filePin.pinSelection': 'Fijar el código seleccionado',
+  'filePin.noSession': 'Selecciona una sesión primero',
+  'filePin.noFile': 'No hay ningún archivo abierto',
+  'filePin.noSelection': 'Selecciona algunas líneas de código primero',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -217,6 +237,11 @@ export const fr = {
   'tab.guide.title': 'Commencer',
   'tab.guide.more': "Plus d'outils",
   'tab.unavailable': 'Rien ici ne peut encore afficher ce type de contenu.',
+  'filePin.pin': 'Épingler dans la zone de saisie : {path}',
+  'filePin.pinSelection': 'Épingler le code sélectionné',
+  'filePin.noSession': "Sélectionnez d'abord une session",
+  'filePin.noFile': 'Aucun fichier ouvert',
+  'filePin.noSelection': 'Sélectionnez d\'abord des lignes de code',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -259,6 +284,11 @@ export const de = {
   'tab.guide.title': 'Starten',
   'tab.guide.more': 'Weitere Werkzeuge',
   'tab.unavailable': 'Diese Art von Inhalten kann hier noch nicht angezeigt werden.',
+  'filePin.pin': 'Im Eingabefeld anheften: {path}',
+  'filePin.pinSelection': 'Ausgewählten Code anheften',
+  'filePin.noSession': 'Wählen Sie zuerst eine Sitzung',
+  'filePin.noFile': 'Keine Datei geöffnet',
+  'filePin.noSelection': 'Wählen Sie zuerst Codezeilen aus',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -301,6 +331,11 @@ export const ru = {
   'tab.guide.title': 'Старт',
   'tab.guide.more': 'Дополнительные инструменты',
   'tab.unavailable': 'Ничто здесь пока не может просматривать такой контент.',
+  'filePin.pin': 'Закрепить в поле ввода: {path}',
+  'filePin.pinSelection': 'Закрепить выделенный код',
+  'filePin.noSession': 'Сначала выберите сеанс',
+  'filePin.noFile': 'Нет открытого файла',
+  'filePin.noSelection': 'Сначала выделите строки кода',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -343,4 +378,9 @@ export const pt = {
   'tab.guide.title': 'Começar',
   'tab.guide.more': 'Mais ferramentas',
   'tab.unavailable': 'Nada aqui pode visualizar esse tipo de conteúdo ainda.',
+  'filePin.pin': 'Fixar na caixa de entrada: {path}',
+  'filePin.pinSelection': 'Fixar o código selecionado',
+  'filePin.noSession': 'Selecione uma sessão primeiro',
+  'filePin.noFile': 'Nenhum arquivo aberto',
+  'filePin.noSelection': 'Selecione algumas linhas de código primeiro',
 } satisfies Record<keyof typeof en, string>

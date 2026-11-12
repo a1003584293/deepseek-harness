@@ -27,6 +27,7 @@ import * as sidebarStores from '../src/client/stores.ts'
 import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
 import { RightbarRoot } from '../src/client/shell/RightbarRoot.tsx'
 import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { FileIndicator } from '../src/client/file-indicator.tsx'
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
 import { GUIDE_ID } from '../src/client/tabs/guide/definition.ts'
@@ -139,6 +140,7 @@ describe('ui-sidebar-right apply', () => {
     expect(registered.map(entry => [entry.name, entry.key, entry.locale, entry.component])).toEqual([
       ['contextMenu.icon', 'sidebar.close', undefined, IconCloseOutlineRegular],
       ['contextMenu.content', 'tab', undefined, TabMenuContent],
+      ['conversation.input.dock', undefined, 'sidebarRight', FileIndicator],
       ['rightbar', undefined, undefined, RightbarRoot],
       ['rightbar.session', undefined, 'sidebarRight', RightbarSeat],
       ['conversation.session.header.corner', undefined, 'sidebarRight', ExpandButton],
@@ -346,7 +348,7 @@ describe('ui-sidebar-right apply', () => {
     expect(dictionaries.size).toBe(0)
     await ctx.plugin({ inject: [...inject], apply }).await()
     expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
-    expect(registered).toHaveLength(7)
+    expect(registered).toHaveLength(8)
   })
 })
 

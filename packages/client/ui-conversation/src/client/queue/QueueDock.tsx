@@ -62,6 +62,12 @@ function queueAttachments(content: InboxState['next-turn'][number]['content']): 
   return attachments
 }
 
+/** Compact reference identity used beside queue thumbnails: leaf name plus an optional line range. */
+function referenceLabel(path: string, startLine?: number, endLine?: number): string {
+  const name = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1) || path
+  return startLine === undefined || endLine === undefined ? name : `${name} ${startLine}-${endLine}`
+}
+
 /** Compact file identity used beside queue thumbnails. */
 function QueueFile({ attachment, label }: { attachment: FileAttachmentRef; label: string }) {
   return (
@@ -336,13 +342,38 @@ export function QueueDock({ useSession, useProjection, updateQueue, notify, load
                           alt={t('queue.image')}
                         />
                       )
-                      : (
-                        <QueueFile
-                          key={`${attachment.value.attachmentId}:${attachment.value.name}:${index}`}
-                          attachment={attachment.value}
-                          label={t('queue.file', { name: attachment.value.name })}
-                        />
-                      ))}
+                      : attachment.type === 'terminal-selection'
+                        ? (
+                          <span
+                            key={`terminal:${index}`}
+                            className={css.file}
+                            title={attachment.value.cwd}
+                          >
+                            <span className={css.fileName}>
+                              {t('queue.terminal', { lines: attachment.value.text.split('\n').length })}
+                            </span>
+                          </span>
+                        )
+                        : attachment.type === 'file-reference'
+                          ? (
+                            <span
+                              key={`reference:${attachment.value.path}:${index}`}
+                              className={css.file}
+                              title={attachment.value.path}
+                            >
+                              <span className={css.fileIcon} aria-hidden><FileTypeIcon path={attachment.value.path} size={16} /></span>
+                              <span className={css.fileName}>
+                                {referenceLabel(attachment.value.path, attachment.value.startLine, attachment.value.endLine)}
+                              </span>
+                            </span>
+                          )
+                          : (
+                            <QueueFile
+                              key={`${attachment.value.attachmentId}:${attachment.value.name}:${index}`}
+                              attachment={attachment.value}
+                              label={t('queue.file', { name: attachment.value.name })}
+                            />
+                          ))}
                   </span>
                 )}
                 <span className={css.preview}>{renderFactorySlot('conversation.user.text', {

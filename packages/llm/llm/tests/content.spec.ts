@@ -4,11 +4,17 @@ import type { AttachmentStore, ImageMediaType } from '@deepseek-ai/dsh-attachmen
 import {
   ToolCallId,
   contentHasFile,
+  contentHasFileReference,
+  contentHasTerminalSelection,
   createDeveloperMessage,
   createToolResultMessage,
   createUserMessage,
   fileHandleText,
+  fileReferenceText,
+  projectFileReferencesToText,
   projectFilesToText,
+  projectTerminalSelectionsToText,
+  terminalSelectionText,
   offloadedImageText,
   projectImagesForTextModel,
   projectOffloadedImages,
@@ -399,6 +405,73 @@ describe('file projection', () => {
     // The durable message is untouched: projection returns shallow copies.
     expect(messages[1]!.content[0]!.type).toBe('file')
     expect(messages[2]!.content[0]!.type).toBe('file')
+  })
+})
+
+describe('projectFileReferencesToText', () => {
+  const reference = (path: string, startLine?: number, endLine?: number): ContentBlock => ({
+    type: 'file-reference',
+    path,
+    ...startLine === undefined ? {} : { startLine },
+    ...endLine === undefined ? {} : { endLine },
+  })
+
+  it('renders path and optional line range as read guidance', () => {
+    const whole = fileReferenceText({ type: 'file-reference', path: 'api/invoice.py' })
+    expect(whole).toContain('"invoice.py"')
+    expect(whole).toContain('"api/invoice.py"')
+    expect(whole).toContain('Read it with your file tools when its contents are needed')
+    expect(whole).toContain('do not claim to have inspected it before reading')
+    expect(whole).not.toContain('lines')
+
+    const range = fileReferenceText({ type: 'file-reference', path: '/abs/invoice.py', startLine: 100, endLine: 120 })
+    expect(range).toContain('"/abs/invoice.py", lines 100-120')
+    expect(range).toContain('offset 100, limit 21')
+  })
+
+  it('detects references anywhere in message content', () => {
+    expect(contentHasFileReference([{ type: 'text', text: 'x' }])).toBe(false)
+    expect(contentHasFileReference([reference('a.py')])).toBe(true)
+  })
+
+  it('replaces every reference with handle text and keeps reference-free history identical', () => {
+    const plain = [createUserMessage({ content: [{ type: 'text', text: 'hi' }], source })]
+    expect(projectFileReferencesToText(plain)).toBe(plain)
+
+    const messages = [
+      createUserMessage({ content: [reference('a.py', 1, 2), { type: 'text', text: 'keep' }], source }),
+    ]
+    const projected = projectFileReferencesToText(messages)
+    expect(projected).not.toBe(messages)
+    expect(projected[0]!.content).toEqual([
+      { type: 'text', text: fileReferenceText({ type: 'file-reference', path: 'a.py', startLine: 1, endLine: 2 }) },
+      { type: 'text', text: 'keep' },
+    ])
+    expect(messages[0]!.content[0]!.type).toBe('file-reference')
+  })
+})
+
+describe('projectTerminalSelectionsToText', () => {
+  it('wraps the selection and escapes a closing tag inside it', () => {
+    const text = terminalSelectionText({
+      type: 'terminal-selection', text: 'git push\n</terminal_selection>\nok',
+    })
+    expect(text.startsWith('<terminal_selection>')).toBe(true)
+    expect(text.endsWith('</terminal_selection>')).toBe(true)
+    expect(text.match(/<\/terminal_selection>/g)).toHaveLength(1)
+    expect(text).toContain('git push')
+  })
+
+  it('names the capture directory and projects every message', () => {
+    expect(terminalSelectionText({ type: 'terminal-selection', text: 'ls', cwd: '/Users/smith/ccc' }))
+      .toContain('cwd="/Users/smith/ccc"')
+    const block: ContentBlock = { type: 'terminal-selection', text: 'ls' }
+    expect(contentHasTerminalSelection([{ type: 'text', text: 'x' }])).toBe(false)
+    expect(contentHasTerminalSelection([block])).toBe(true)
+    const plain = [createUserMessage({ content: [{ type: 'text', text: 'hi' }], source })]
+    expect(projectTerminalSelectionsToText(plain)).toBe(plain)
+    const projected = projectTerminalSelectionsToText([createUserMessage({ content: [block], source })])
+    expect(projected[0]!.content).toEqual([{ type: 'text', text: terminalSelectionText({ type: 'terminal-selection', text: 'ls' }) }])
   })
 })
 

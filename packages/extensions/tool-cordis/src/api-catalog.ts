@@ -5837,7 +5837,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AdmittedPromptContentPart',
-    declaration: 'export type AdmittedPromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly attachment: ImageAttachmentRef;\n} | {\n    readonly type: \'file\';\n    readonly attachment: FileAttachmentRef;\n};',
+    declaration: 'export type AdmittedPromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly attachment: ImageAttachmentRef;\n} | {\n    readonly type: \'file\';\n    readonly attachment: FileAttachmentRef;\n} | FileReferencePart | TerminalSelectionPart;',
   },
   {
     name: 'AfterScheduleRecord',
@@ -6365,7 +6365,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContentBlockMap',
-    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-addition\': ToolAdditionBlock;\n    \'tool-removal\': ToolRemovalBlock;\n}',
+    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'file-reference\': FileReferenceBlock;\n    \'terminal-selection\': TerminalSelectionBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-addition\': ToolAdditionBlock;\n    \'tool-removal\': ToolRemovalBlock;\n}',
   },
   {
     name: 'ContentBlockType',
@@ -6748,8 +6748,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FileLocation {\n    path: string;\n    line?: number;\n}',
   },
   {
+    name: 'FileReferenceBlock',
+    declaration: 'export interface FileReferenceBlock {\n    type: \'file-reference\';\n    path: string;\n    startLine?: number;\n    endLine?: number;\n}',
+  },
+  {
     name: 'FileReferenceCandidate',
     declaration: 'export interface FileReferenceCandidate {\n    path: string;\n    kind: \'file\' | \'directory\';\n}',
+  },
+  {
+    name: 'FileReferencePart',
+    declaration: 'export interface FileReferencePart {\n    readonly type: \'file-reference\';\n    readonly path: string;\n    readonly startLine?: number;\n    readonly endLine?: number;\n}',
   },
   {
     name: 'FileUploadReceiptId',
@@ -10030,6 +10038,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalScreenRequest',
     declaration: 'export interface TerminalScreenRequest {\n    readonly offset: number;\n    readonly count: number;\n    readonly maxBytes: number;\n}',
+  },
+  {
+    name: 'TerminalSelectionBlock',
+    declaration: 'export interface TerminalSelectionBlock {\n    type: \'terminal-selection\';\n    text: string;\n    cwd?: string;\n}',
+  },
+  {
+    name: 'TerminalSelectionPart',
+    declaration: 'export interface TerminalSelectionPart {\n    readonly type: \'terminal-selection\';\n    readonly text: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'TerminalSendOperation',

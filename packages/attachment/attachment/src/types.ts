@@ -92,6 +92,20 @@ export interface EncodedImageAttachment {
 }
 
 /**
+ * One user-pinned path reference: a file the model should read on demand,
+ * optionally limited to a line range. It carries no bytes and no stored object.
+ */
+export interface FileReferencePart {
+  readonly type: 'file-reference'
+  /** Session-workspace-relative or absolute `/`-separated path. */
+  readonly path: string
+  /** First selected line, 1-based; present only with `endLine`. */
+  readonly startLine?: number
+  /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+  readonly endLine?: number
+}
+
+/**
  * Browser-submitted prompt content accepted by Host prompt endpoints; the
  * accepting Host promotes image parts to durable references through
  * `ctx.attachments.admitPromptContent()` before any message is created, so a wire caller can
@@ -105,6 +119,8 @@ export type PromptContentPart =
     readonly data: string
     readonly name?: string
   }
+  | FileReferencePart
+  | TerminalSelectionPart
 
 /**
  * Host prompt content whose upload receipts are resolved. An image part
@@ -117,11 +133,22 @@ export type AttachmentAdmissionPart =
   | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
   | { readonly type: 'image'; readonly attachment: ImageAttachmentRef; readonly encodedBytes: number }
 
+/** One user-pinned terminal selection submitted with a prompt. */
+export interface TerminalSelectionPart {
+  readonly type: 'terminal-selection'
+  /** Selected terminal text, verbatim. */
+  readonly text: string
+  /** Working directory the selection was captured in, when known. */
+  readonly cwd?: string
+}
+
 /** Host-admitted prompt content with every attachment represented by its durable reference. */
 export type AdmittedPromptContentPart =
   | { readonly type: 'text'; readonly text: string }
   | { readonly type: 'image'; readonly attachment: ImageAttachmentRef }
   | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+  | FileReferencePart
+  | TerminalSelectionPart
 
 /** Request to validate and durably commit one image. */
 export interface SaveImageAttachment {

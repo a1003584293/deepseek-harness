@@ -73,9 +73,9 @@ export const ChatFlow = memo(function ChatFlow({
   for (const [index, item] of pendingInputs.entries()) {
     const row = isLocalSubmission(item)
       ? <PendingSubmissionBubble key={item.requestId} submission={item}
-        loadImage={loadImage} renderFactorySlot={renderFactorySlot} t={t} />
+        loadImage={loadImage} openFile={openFile} renderFactorySlot={renderFactorySlot} t={t} />
       : <PendingSteeringBubble key={item.id} content={item.content}
-        loadImage={loadImage} renderFactorySlot={renderFactorySlot} t={t} />
+        loadImage={loadImage} openFile={openFile} renderFactorySlot={renderFactorySlot} t={t} />
     if (index <= firstTranscript) leadingRows.push(row)
     else if (isTranscriptEcho(item)) openingRows.push(row)
     else pendingRows.push(row)

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { absoluteFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
@@ -40,10 +40,15 @@ function contents(pages: readonly string[], eof = false): DocumentContent {
 
 /** Unused framework seats are omitted; this renderer reads only owner data and t. */
 function props(content: DocumentContent, overrides: Partial<CodeBodyProps> = {}): CodeBodyProps {
+  const resourceAddress = overrides.resourceAddress ?? sessionFileAddress(SESSION, 'source.ts')
   return {
-    resourceAddress: sessionFileAddress(SESSION, 'source.ts'), sessionId: SESSION,
-    content, wrap: false, t: (key: keyof typeof en) => en[key], ...overrides,
-  } as CodeBodyProps
+    resourceAddress, sessionId: SESSION,
+    content, wrap: false, t: (key: keyof typeof en) => en[key],
+    useTabInfo: () => ({ tab: { navigation: { address: resourceAddress } } }),
+    reportSelection: () => {},
+    clearSelection: () => {},
+    ...overrides,
+  } as unknown as CodeBodyProps
 }
 
 function element(root: HTMLElement, selector: string): HTMLElement {
@@ -73,7 +78,29 @@ function installStyles(): void {
 
 describe('CodeBody', () => {
   it('rejects a malformed file address without starting the highlighter', () => {
-    expect(() => CodeBody(props(contents(['plain'], true), { resourceAddress: 'not-a-file-address' }))).toThrow('not a file address')
+    expect(() => render(<CodeBody {...props(contents(['plain'], true), { resourceAddress: 'not-a-file-address' })} />))
+      .toThrow('not a file address')
+  })
+
+  it('publishes the selected whole-line range and clears it when the body unmounts', async () => {
+    const reported: Array<{ startLine: number; endLine: number }> = []
+    const cleared = vi.fn()
+    const view = render(<CodeBody {...props(contents(['alpha', 'beta', 'gamma'], true), {
+      reportSelection: (selection) => { reported.push({ startLine: selection.startLine, endLine: selection.endLine }) },
+      clearSelection: cleared,
+    })} />)
+    await waitFor(() => { expect(view.container.querySelectorAll('.line')).toHaveLength(3) })
+    const lines = [...view.container.querySelectorAll<HTMLElement>('.line')]
+    const range = document.createRange()
+    range.setStart(lines[1]!.firstChild!, 0)
+    range.setEnd(lines[2]!.firstChild!, 1)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+    expect(reported.at(-1)).toEqual({ startLine: 2, endLine: 3 })
+    cleanup()
+    expect(cleared).toHaveBeenCalled()
   })
 
   it.each([

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-12-pinned-prompt-references.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-12-pinned-prompt-references.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-12-pinned-prompt-references:
+  en: 62fc0140ed8a6511
+  zh: b9f88a07b5e765ff
+/2026-11-12-pinned-prompt-references/summary:
+  en: 763e5811317cc627
+  zh: d5bf8e90ba6b5efb
+/2026-11-12-pinned-prompt-references/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-12-pinned-prompt-references/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-12-pinned-prompt-references/compatibility:
+  en: ccc24f99caa68a5c
+  zh: 8a7d840569a454b8
+/2026-11-12-pinned-prompt-references/verification:
+  en: efc872ee7d974a98
+  zh: b4fa353c1dcef8d0
+/2026-11-12-pinned-prompt-references/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

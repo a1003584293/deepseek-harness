@@ -20,7 +20,7 @@ import {
   ApiSessionAgentController,
   type ApiSessionAgentResult,
 } from './agent.ts'
-import { SessionCommandController, hasPromptContent } from './commands.ts'
+import { SessionCommandController, assertPromptReferences, hasPromptContent } from './commands.ts'
 import { SessionControlController } from './control.ts'
 import { HistoryController } from './history/controller.ts'
 import { StateController } from './state/controller.ts'
@@ -472,6 +472,7 @@ export class SessionController extends TypertRemoteService {
     if (request.content.length > 0 && !hasPromptContent(request.content)) {
       throw new RemoteError('gateway/bad-request', 'prompt content must include non-whitespace text or an attachment', {})
     }
+    assertPromptReferences(request.content)
     const clientTimeZone = request.clientTimeZone === undefined
       ? undefined
       : canonicalClientTimeZone(request.clientTimeZone)

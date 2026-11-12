@@ -89,6 +89,8 @@ function mount(initial: TerminalViewState | undefined = idle, dictionary = en) {
     useTerminal: (_key: string, select?: (value: TerminalViewState | undefined) => unknown) => select === undefined ? state : select(state),
     useTheme: (select: (value: ThemeSnapshot) => unknown) => select(theme),
     useTabInfo: tab, t: makeTranslate(dictionary),
+    openSelectionMenu: vi.fn(),
+    registerSelectionReader: vi.fn(() => () => {}),
   } as unknown as TerminalBodyProps
   const view = render(<TerminalBody {...props} />)
   return {

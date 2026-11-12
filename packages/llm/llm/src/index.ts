@@ -38,7 +38,9 @@ import type { BuiltinLlmFailureCode } from './error.ts'
 import { normalizeLlmFailure } from './adapter-failure.ts'
 import { normalizeApiKey } from './api-key.ts'
 import {
-  contentHasFile, contentHasImage, fileHandleText, projectFilesToText, projectImagesForTextModel, projectToolUpdates,
+  contentHasFile, contentHasFileReference, contentHasImage, contentHasTerminalSelection, fileHandleText,
+  projectFileReferencesToText, projectFilesToText, projectImagesForTextModel,
+  projectTerminalSelectionsToText, projectToolUpdates,
 } from './content.ts'
 import type { FileAttachmentRef, ImageAttachmentRef, ImageRequestTarget } from '@deepseek-ai/dsh-attachment'
 
@@ -1116,6 +1118,15 @@ export class LlmRuntime extends TypertRemoteService {
       let projectedMessages: readonly RequestMessage[] = resolvedOptions.messages
       if (projectedMessages.some(message => contentHasFile(message.content))) {
         projectedMessages = projectFilesToText(projectedMessages, ref => this.fileReadPath(ref))
+      }
+      // Pinned path references are never dispatched to a provider either: every
+      // route receives path and line-range text instead.
+      if (projectedMessages.some(message => contentHasFileReference(message.content))) {
+        projectedMessages = projectFileReferencesToText(projectedMessages)
+      }
+      // Pinned terminal output reaches every route as a recorded element.
+      if (projectedMessages.some(message => contentHasTerminalSelection(message.content))) {
+        projectedMessages = projectTerminalSelectionsToText(projectedMessages)
       }
       if (modelInfo.inputModalities !== undefined
         && !modelInfo.inputModalities.includes('image')

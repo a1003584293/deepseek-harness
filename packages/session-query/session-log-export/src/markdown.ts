@@ -215,6 +215,11 @@ function visibleContent(content: UserMessage['content']): string {
       case 'file':
         parts.push(fileLabel(block.attachment))
         break
+      case 'file-reference':
+        parts.push(block.startLine === undefined || block.endLine === undefined
+          ? `@${block.path}`
+          : `@${block.path}:${block.startLine}-${block.endLine}`)
+        break
       default:
         break
     }

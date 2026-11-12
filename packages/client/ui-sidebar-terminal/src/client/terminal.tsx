@@ -1,5 +1,5 @@
 /** Sidebar terminal screen and connection recovery. */
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { Button, IconPlusOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -21,7 +21,9 @@ export type TerminalBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLo
  * @param props - sidebar occurrence, model lookup and translated copy.
  * @returns the terminal screen and any pending or exceptional state.
  */
-export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t }: TerminalBodyProps): ReactNode {
+export function TerminalBody({
+  useTabInfo, useTerminal, useTheme, view, openSelectionMenu, registerSelectionReader, t,
+}: TerminalBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const theme = useTheme(value => value)
   const model = view(tab.id)
@@ -63,7 +65,9 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t }: Ter
           : <Button variant="outline" size="sm" onClick={() => { model.connect() }}>{t('reconnect')}</Button>)}
         {ended && newTerminal}
       </div>}
-      {state.info !== undefined && <TerminalScreen state={state} model={model} visible={tab.visible} label={t('title')} theme={theme} />}
+      {state.info !== undefined && <TerminalScreen state={state} model={model} tabKey={tab.id} visible={tab.visible} label={t('title')} theme={theme}
+        cwd={state.environment?.cwd} openSelectionMenu={openSelectionMenu}
+        registerSelectionReader={registerSelectionReader} />}
       {error !== undefined && <p className={css.error} role="alert">{t('failed', { message: error })}</p>}
     </section>
   )
@@ -80,12 +84,16 @@ const INPUT_GESTURES = ['keydown', 'beforeinput', 'paste', 'compositionend', 'dr
 const FOCUS_REPORTS = new Set(['\x1b[I', '\x1b[O'])
 
 /* oxlint-disable typescript/no-non-null-assertion -- React sets the DOM ref, then these effects initialize and use the emulator. */
-function TerminalScreen({ state, model, visible, label, theme }: {
+function TerminalScreen({ state, model, tabKey, visible, label, theme, cwd, openSelectionMenu, registerSelectionReader }: {
   state: TerminalViewState
   model: TerminalView
+  tabKey: string
   visible: boolean
   label: string
   theme: ThemeSnapshot
+  cwd: string | undefined
+  openSelectionMenu: TerminalBodyInjected['openSelectionMenu']
+  registerSelectionReader: TerminalBodyInjected['registerSelectionReader']
 }): ReactNode {
   const element = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal>()
@@ -137,6 +145,13 @@ function TerminalScreen({ state, model, visible, label, theme }: {
     }
   }, [model])
 
+  // The keyboard pin gesture reads this screen's own xterm selection.
+  useEffect(() => registerSelectionReader(tabKey, () => {
+    if (!current.current.visible) return undefined
+    const text = terminal.current?.getSelection() ?? ''
+    return text.trim() === '' ? undefined : { text, ...cwd === undefined ? {} : { cwd } }
+  }), [registerSelectionReader, tabKey, cwd])
+
   useLayoutEffect(() => {
     const style = getComputedStyle(element.current!)
     colors.current!.update(style.backgroundColor, style.color)
@@ -177,7 +192,14 @@ function TerminalScreen({ state, model, visible, label, theme }: {
     terminal.current!.textarea?.setAttribute('aria-label', label)
   }, [label])
   useEffect(() => { if (visible && state.writable) terminal.current!.focus() }, [visible, state.writable])
-  return <div className={css.screen} ref={element} />
+  // A non-empty selection opens the shared menu; an empty one keeps xterm's own gesture.
+  const selectionMenu = (event: ReactMouseEvent<HTMLDivElement>): void => {
+    const text = terminal.current?.getSelection() ?? ''
+    if (text.trim() === '') return
+    event.preventDefault()
+    openSelectionMenu(text, cwd, { x: event.clientX, y: event.clientY })
+  }
+  return <div className={css.screen} ref={element} onContextMenu={selectionMenu} />
 }
 /* oxlint-enable typescript/no-non-null-assertion */
 

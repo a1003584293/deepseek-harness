@@ -31,7 +31,7 @@ kind: "package-reference"
 
 ### 草稿附件
 
-图片与通用文件按选择顺序进入同一条不换行的横向附件栏。所有条目均为 64px 高：图片是 64px 方形缩略图，通用文件是 240px 宽的 DeepSeek Web 卡片，带 16px 圆角、蓝色渐变文档图标、文件名，以及大写扩展名与字节大小。溢出隐藏时由边缘箭头翻页，滚动条保持隐藏，新增条目会滚动到栏尾展示。文件上传时图标位置显示 spinner，传输层报告字节时显示进度，首次报告前使用不定态进度条；失败时显示重试。上传中的图片在缩略图底边显示同样的进度条，上传失败的图片缩略图变成重试控件；Host 拒绝的图片则用缩略图的提示说明原因，点按也能固定该提示，只能移除。移除按钮在悬停或键盘聚焦时出现，在触摸设备上保持可见。单击图片会打开原图。
+图片、通用文件与钉住的引用按选择顺序进入同一条可换行的附件栏。图片与通用文件为 64px 高：图片是 64px 方形缩略图，通用文件是 240px 宽的 DeepSeek Web 卡片，带 16px 圆角、蓝色渐变文档图标、文件名，以及大写扩展名与字节大小；钉住的引用是 28px 的 chip，显示文件名与行范围。条目保持自身宽度，超出时换行而不是横向滚动，因此不会有附件藏在翻页控件后面。文件上传时图标位置显示 spinner，传输层报告字节时显示进度，首次报告前使用不定态进度条；失败时显示重试。上传中的图片在缩略图底边显示同样的进度条，上传失败的图片缩略图变成重试控件；Host 拒绝的图片则用缩略图的提示说明原因，点按也能固定该提示，只能移除。移除按钮在悬停或键盘聚焦时出现，在触摸设备上保持可见。单击图片会打开原图。
 
 ### 消息图片与灯箱
 
@@ -61,7 +61,7 @@ Trajectory 附件行使用 48px 方形缩略图，完整缩放图片而不裁剪
 |---|---|
 | [`src/client/ComposerAttachments.tsx`](src/client/ComposerAttachments.tsx) | 有序图片／文件栏＋拖放遮罩的组装 |
 | [`src/client/drop-events.ts`](src/client/drop-events.ts) | 每个已挂载附件视图的 effect 安装的 document 拖放监听 |
-| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | 附件横向溢出、滚轮转换、边缘箭头 |
+| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | 附件换行排列 |
 | [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | 每消息画廊＋灯箱的组装 |
 | [`src/MessageImage.tsx`](src/MessageImage.tsx) | 单图尺寸、加载／重试、点击打开；本地提交回显预览直接显示其 object URL |
 | [`ImageLightbox`](../ui-primitives/src/ImageLightbox.tsx) | 铺在共享遮罩上的文档级模态预览 |

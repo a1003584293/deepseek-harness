@@ -102,6 +102,8 @@ interface BenchOptions {
   t?: InputBarProps['t']
   accessory?: React.ReactNode
   overlay?: React.ReactNode
+  /** Node the attachments slot renders, for placement assertions. */
+  attachmentsEntry?: React.ReactNode
   leftItems?: React.ReactNode
   rightItems?: React.ReactNode
   activityEntry?: (owner: InputActivityOwnerProps) => React.ReactNode
@@ -173,6 +175,7 @@ function bench(over?: BenchOptions) {
   const slotCalls: { key: string; owner: unknown }[] = []
   const renderSlot = ((key: string, owner: object) => {
     slotCalls.push({ key, owner })
+    if (key === 'conversation.input.attachments') return over?.attachmentsEntry ?? null
     if (key === 'conversation.input.overlay') return over?.overlay ?? null
     if (key === 'conversation.input.left') return over?.leftItems ?? null
     if (key === 'conversation.input.right') return over?.rightItems ?? null
@@ -746,6 +749,15 @@ describe('image draft rail', () => {
   it('marks the attachment slot unavailable while the composer is locked', () => {
     const result = bench({ addFiles: vi.fn(() => null), inert: true })
     expect(attachmentOwner(result.slotCalls).canAcceptDrop).toBe(false)
+  })
+
+  it('renders the attachment rail above the card so a draft never pushes the text line down', () => {
+    const rail = <div data-testid="attachment-rail" />
+    const { view } = bench({ attachmentsEntry: rail })
+    const card = view.container.querySelector('[data-composer-card]')!
+    const rendered = view.getByTestId('attachment-rail')
+    expect(card.contains(rendered)).toBe(false)
+    expect(rendered.nextElementSibling).toBe(card)
   })
 
   it('sends an image-only draft and exposes removal through the attachment slot', async () => {
@@ -2135,7 +2147,7 @@ describe('command launcher chrome and control seats', () => {
     // Every seat dispatched, nothing rendered (render passes may repeat; the
     // seat set is the contract).
     expect([...new Set(slotCalls.map(c => c.key))]).toEqual([
-      'conversation.input.overlay', 'conversation.input.attachments',
+      'conversation.input.attachments', 'conversation.input.overlay',
       'conversation.input.permission', 'conversation.input.plan', 'conversation.input.left',
       'conversation.input.right', 'conversation.input.model', 'conversation.input.activity',
       'conversation.composer.dock',

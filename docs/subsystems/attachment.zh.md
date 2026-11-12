@@ -77,6 +77,8 @@ type PromptContentPart =
     readonly data: string
     readonly name?: string
   }
+  | FileReferencePart
+  | TerminalSelectionPart
 ```
 
 ```ts type-equiv
@@ -98,6 +100,8 @@ type AdmittedPromptContentPart =
   | { readonly type: 'text'; readonly text: string }
   | { readonly type: 'image'; readonly attachment: ImageAttachmentRef }
   | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+  | FileReferencePart
+  | TerminalSelectionPart
 ```
 
 ```ts type-equiv

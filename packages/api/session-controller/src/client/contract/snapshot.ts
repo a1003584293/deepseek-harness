@@ -29,10 +29,36 @@ export interface PendingSubmissionFileAttachment {
   readonly value: FileAttachmentRef
 }
 
+/** Pinned path reference branch of a local submission echo attachment. */
+export interface PendingSubmissionReferenceAttachment {
+  readonly type: 'file-reference'
+  readonly value: {
+    /** Session-workspace-relative or absolute path. */
+    readonly path: string
+    /** First selected line, 1-based; present only with `endLine`. */
+    readonly startLine?: number
+    /** Last selected line, 1-based and inclusive; present only with `startLine`. */
+    readonly endLine?: number
+  }
+}
+
+/** Pinned terminal selection branch of a local submission echo attachment. */
+export interface PendingSubmissionTerminalAttachment {
+  readonly type: 'terminal-selection'
+  readonly value: {
+    /** Selected terminal text, verbatim. */
+    readonly text: string
+    /** Working directory the selection was captured in, when known. */
+    readonly cwd?: string
+  }
+}
+
 /** One attachment displayed by a local submission echo, in prompt order. */
 export type PendingSubmissionAttachment =
   | PendingSubmissionImageAttachment
   | PendingSubmissionFileAttachment
+  | PendingSubmissionReferenceAttachment
+  | PendingSubmissionTerminalAttachment
 
 /** Client surface selected when a local submission begins. */
 export type PendingSubmissionPlacement = 'transcript' | 'queued' | 'steering'

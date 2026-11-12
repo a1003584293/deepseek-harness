@@ -204,6 +204,7 @@ describe('ConversationController', () => {
     expect(drafts.map(draft => draft.kind)).toEqual(['image', 'file'])
     expect(created).toHaveBeenCalledTimes(1)
     const [imageDraft, fileDraft] = [drafts[0]!, drafts[1]!]
+    if (imageDraft.kind !== 'image' || fileDraft.kind !== 'file') throw new Error('unexpected draft kinds')
     expect(b.root.fileUploads.getSnapshot()[fileDraft.id]?.status).toBe('uploading')
     expect(b.root.fileUploads.getSnapshot()[imageDraft.id]?.status).toBe('uploading')
     await vi.waitFor(() => {
@@ -665,6 +666,64 @@ describe('sendSession submission echo', () => {
       await expect(sending).resolves.toEqual({ kind: 'success' })
       expect(b.root.resolveDraftAttachments([attachment!.id])).toEqual([])
       expect(b.revoked).toHaveBeenCalledWith('blob:echo-1')
+    } finally {
+      b.restore()
+    }
+    await b.runtime.dispose()
+  })
+
+  it('serializes a pinned path reference as a structured block, never an upload', async () => {
+    const b = await echoBench()
+    try {
+      const draft = b.root.addReference({ path: 'api/invoice.py', startLine: 100, endLine: 120 })
+      const session = b.runtime.sessions.binding('s1')!.session
+      const sending = b.root.sendSession(session, '看这里', [draft.id], 'queue')
+      const echo = await b.begun
+      expect(echo?.attachments).toEqual([
+        { type: 'file-reference', value: { path: 'api/invoice.py', startLine: 100, endLine: 120 } },
+      ])
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
+      expect(b.prompt).toHaveBeenCalledWith(
+        [
+          { type: 'file-reference', path: 'api/invoice.py', startLine: 100, endLine: 120 },
+          { type: 'text', text: '看这里' },
+        ],
+        'queue',
+        undefined,
+        'req-echo',
+      )
+      b.retire.onRetire?.({ reason: 'observed', attachments: [] })
+      await expect(sending).resolves.toEqual({ kind: 'success' })
+      expect(b.root.resolveDraftAttachments([draft.id])).toEqual([])
+    } finally {
+      b.restore()
+    }
+    await b.runtime.dispose()
+  })
+
+  it('serializes a pinned terminal selection as a structured block', async () => {
+    const b = await echoBench()
+    try {
+      const draft = b.root.addTerminalSelection({ text: 'git push\nok', cwd: '/Users/smith/ccc' })
+      const session = b.runtime.sessions.binding('s1')!.session
+      const sending = b.root.sendSession(session, '看终端', [draft.id], 'queue')
+      const echo = await b.begun
+      expect(echo?.attachments).toEqual([
+        { type: 'terminal-selection', value: { text: 'git push\nok', cwd: '/Users/smith/ccc' } },
+      ])
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
+      expect(b.prompt).toHaveBeenCalledWith(
+        [
+          { type: 'terminal-selection', text: 'git push\nok', cwd: '/Users/smith/ccc' },
+          { type: 'text', text: '看终端' },
+        ],
+        'queue',
+        undefined,
+        'req-echo',
+      )
+      b.retire.onRetire?.({ reason: 'observed', attachments: [] })
+      await expect(sending).resolves.toEqual({ kind: 'success' })
+      expect(b.root.resolveDraftAttachments([draft.id])).toEqual([])
     } finally {
       b.restore()
     }

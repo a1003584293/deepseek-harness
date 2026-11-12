@@ -1,6 +1,8 @@
 /** Content-block structure helpers. @module @deepseek-ai/dsh-llm/content */
 
-import type { ContentBlock, ImageBlock, LlmImageRequestBudget, ToolSchema, ToolUpdate, ToolHistory } from './types.ts'
+import type {
+  ContentBlock, FileReferenceBlock, ImageBlock, LlmImageRequestBudget, TerminalSelectionBlock, ToolSchema, ToolUpdate, ToolHistory,
+} from './types.ts'
 import type { RequestMessage } from './types.ts'
 import type { Message } from './message.ts'
 import type { MessageId } from './brand.ts'
@@ -204,6 +206,118 @@ export function projectFilesToText(
   if (!messages.some(message => contentHasFile(message.content))) return messages
   return messages.map((message) => {
     const content = replaceFilesWithHandles(message.content, resolvePath)
+    return content === message.content ? message : { ...message, content }
+  })
+}
+
+/**
+ * True when typed model content contains a pinned file reference.
+ * @param content - typed model content blocks.
+ * @returns whether any block is a pinned file reference.
+ */
+export function contentHasFileReference(content: readonly ContentBlock[]): boolean {
+  for (const block of content) {
+    if (block.type === 'file-reference') return true
+  }
+  return false
+}
+
+/**
+ * Stable model-facing handle for one pinned file reference: the path to read
+ * and, when present, the line range that produced it. The block carries no
+ * bytes, so this text is the only representation a provider ever receives.
+ * @param block - pinned file reference.
+ * @returns deterministic handle text naming the path and optional line range.
+ */
+export function fileReferenceText(block: FileReferenceBlock): string {
+  const leaf = block.path.slice(Math.max(block.path.lastIndexOf('/'), block.path.lastIndexOf('\\')) + 1)
+  const range = block.startLine !== undefined && block.endLine !== undefined
+    ? `, lines ${block.startLine}-${block.endLine}`
+    : ''
+  const guide = block.startLine === undefined || block.endLine === undefined
+    ? 'Read it with your file tools when its contents are needed'
+    : `Read that range with your file tools (offset ${block.startLine}, limit ${block.endLine - block.startLine + 1}) when it is needed`
+  return `[File ${quoted(leaf === '' ? block.path : leaf)} at ${quoted(block.path)}${range}: pinned by the user. ${guide}; do not claim to have inspected it before reading.]`
+}
+
+/** Replace every pinned reference with its handle text. */
+function replaceFileReferences(blocks: readonly ContentBlock[]): ContentBlock[] {
+  let next: ContentBlock[] | undefined
+  for (const [index, block] of blocks.entries()) {
+    if (block.type === 'file-reference') {
+      next ??= blocks.slice(0, index)
+      next.push({ type: 'text', text: fileReferenceText(block) })
+      continue
+    }
+    next?.push(block)
+  }
+  return next ?? blocks as ContentBlock[]
+}
+
+/**
+ * Project pinned file references into deterministic handle text for every
+ * model route. No provider receives the range natively, so this projection is
+ * unconditional in request assembly.
+ * @param messages - complete request history.
+ * @returns the original list without references, otherwise shallow message copies with handle text.
+ */
+export function projectFileReferencesToText(messages: readonly RequestMessage[]): readonly RequestMessage[] {
+  if (!messages.some(message => contentHasFileReference(message.content))) return messages
+  return messages.map((message) => {
+    const content = replaceFileReferences(message.content)
+    return content === message.content ? message : { ...message, content }
+  })
+}
+
+/**
+ * Whether typed model content contains a pinned terminal selection.
+ * @param content - one message's content blocks.
+ * @returns whether any block is a pinned terminal selection.
+ */
+export function contentHasTerminalSelection(content: readonly ContentBlock[]): boolean {
+  for (const block of content) {
+    if (block.type === 'terminal-selection') return true
+  }
+  return false
+}
+
+/**
+ * Deterministic model-facing text for one pinned terminal selection. Closing
+ * tags inside the text are escaped so the recorded output cannot end the
+ * element early.
+ * @param block - pinned terminal selection.
+ * @returns the `<terminal_selection>` element, with its capture directory when known.
+ */
+export function terminalSelectionText(block: TerminalSelectionBlock): string {
+  const body = block.text.replaceAll('</terminal_selection>', '<\\/terminal_selection>')
+  const cwd = block.cwd === undefined ? '' : ` cwd=${quoted(block.cwd)}`
+  return `<terminal_selection${cwd}>\n${body}\n</terminal_selection>`
+}
+
+/** Replace every pinned terminal selection with its element text. */
+function replaceTerminalSelections(blocks: readonly ContentBlock[]): ContentBlock[] {
+  let next: ContentBlock[] | undefined
+  for (const [index, block] of blocks.entries()) {
+    if (block.type === 'terminal-selection') {
+      next ??= blocks.slice(0, index)
+      next.push({ type: 'text', text: terminalSelectionText(block) })
+      continue
+    }
+    next?.push(block)
+  }
+  return next ?? blocks as ContentBlock[]
+}
+
+/**
+ * Project pinned terminal selections into their element text for every model
+ * route.
+ * @param messages - complete request history.
+ * @returns the original list without terminal selections, otherwise shallow message copies.
+ */
+export function projectTerminalSelectionsToText(messages: readonly RequestMessage[]): readonly RequestMessage[] {
+  if (!messages.some(message => contentHasTerminalSelection(message.content))) return messages
+  return messages.map((message) => {
+    const content = replaceTerminalSelections(message.content)
     return content === message.content ? message : { ...message, content }
   })
 }

@@ -177,6 +177,26 @@ describe('user Content Factory', () => {
     expect(view.container.querySelector('[data-slot="root"]')?.firstElementChild?.children).toHaveLength(1)
   })
 
+  it('renders pinned references above the bubble and opens the file at its first line', async () => {
+    const b = await bench()
+    const openFile = vi.fn()
+    const content: UserContentData = {
+      ...empty,
+      text: '看看这里',
+      attachments: [
+        { type: 'reference', reference: { path: 'api/invoice.py', startLine: 100, endLine: 120 } },
+        { type: 'reference', reference: { path: 'api/other.py' } },
+      ],
+    }
+    const view = b.render(b.factory({ content, facts: {}, loadImage: b.loadImage, openFile }))
+    const row = view.container.querySelector('[data-message-attachments]')
+    expect([...row?.children ?? []].map(child => child.textContent)).toEqual(['invoice.py 100-120', 'other.py'])
+    fireEvent.click(view.getByRole('button', { name: /invoice\.py/ }))
+    expect(openFile).toHaveBeenCalledWith('api/invoice.py', { line: 100 })
+    fireEvent.click(view.getByRole('button', { name: /other\.py/ }))
+    expect(openFile).toHaveBeenLastCalledWith('api/other.py', {})
+  })
+
   it('reuses one prepared value in unrelated parents while nested images inherit each Session', async () => {
     const b = await bench()
     await b.runtime.sessions.add({ id: 'other-user-content' })

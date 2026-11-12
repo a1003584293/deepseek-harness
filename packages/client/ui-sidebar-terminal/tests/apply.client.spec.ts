@@ -91,6 +91,9 @@ async function mountPlugin() {
   } as never)
   const theme = { preference: 'light' as const, fontSizes: { text: 14, code: 11, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' }, active: { id: 'light', colorScheme: 'light' as const, tokens: {} }, themes: [], revision: 0 }
   ctx.provide('theme', { getTheme: () => theme } as never)
+  ctx.provide('contextMenus', {
+    open: vi.fn(), notify: vi.fn(), register: vi.fn(() => () => {}),
+  } as never)
   const fiber = await ctx.plugin({ inject, apply })
   return {
     tabs, entries, dictionaries, terminals, model, occurrence, openTabIn, tabsIn, closeIn, sidebarTabs, openTabs, theme,

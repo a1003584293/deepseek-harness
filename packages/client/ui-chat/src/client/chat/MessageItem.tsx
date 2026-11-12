@@ -26,13 +26,37 @@ function contentParts(content: readonly unknown[]): {
   const attachments: UserContentAttachment[] = []
   const rest: unknown[] = []
   for (const block of content) {
-    const b = block as { type?: string; text?: string; attachment?: unknown }
+    const b = block as {
+      type?: string
+      text?: string
+      attachment?: unknown
+      path?: unknown
+      startLine?: unknown
+      endLine?: unknown
+      cwd?: unknown
+    }
     if (b.type === 'text' && typeof b.text === 'string') texts.push(b.text)
     else if (b.type === 'image' && b.attachment !== undefined) {
       attachments.push({ type: 'image', image: { attachment: (b as UserImage).attachment } })
     }
     else if (b.type === 'file' && b.attachment !== undefined) {
       attachments.push({ type: 'file', file: (b as UserFile).attachment })
+    }
+    else if (b.type === 'terminal-selection' && typeof b.text === 'string') {
+      attachments.push({
+        type: 'terminal',
+        terminal: { text: b.text, ...typeof b.cwd === 'string' ? { cwd: b.cwd } : {} },
+      })
+    }
+    else if (b.type === 'file-reference' && typeof b.path === 'string') {
+      attachments.push({
+        type: 'reference',
+        reference: {
+          path: b.path,
+          ...typeof b.startLine === 'number' ? { startLine: b.startLine } : {},
+          ...typeof b.endLine === 'number' ? { endLine: b.endLine } : {},
+        },
+      })
     }
     else rest.push(block)
   }
@@ -177,7 +201,7 @@ const NO_MESSAGE_SOURCE: PropsRenderSlots<'conversation.chat.user.before'>['rend
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  node, renderSlotChain, content, loadImage, renderFactorySlot, actions,
+  node, renderSlotChain, content, loadImage, openFile, renderFactorySlot, actions,
   pending = false, echo = false, batchStart = false,
   referenceLabels, skillNames, previewAttachments, facts: inputFacts = EMPTY_TEXT_FACTS, interactive = false,
 }: {
@@ -203,7 +227,7 @@ function UserStyleBubble({
   previewAttachments?: readonly UserContentAttachment[]
   /** Inputs used by text transforms, separate from row and rendering props. */
   facts?: Readonly<Partial<UserTextFacts>>
-} & Pick<ChatNodeOwnerProps, 'loadImage'> & Pick<UserContentInput, 'interactive'>): ReactNode {
+} & Pick<ChatNodeOwnerProps, 'loadImage' | 'openFile'> & Pick<UserContentInput, 'interactive'>): ReactNode {
   const parts = useMemo(() => contentParts(content), [content])
   const prepared = useMemo<UserContentData>(() => ({
     text: parts.text,
@@ -227,6 +251,7 @@ function UserStyleBubble({
       {renderFactorySlot('conversation.chat.user.content', {
         content: prepared,
         loadImage,
+        openFile,
         facts,
         interactive,
       })}
@@ -241,11 +266,11 @@ function UserStyleBubble({
  * @param props - pending content, authorized image loader, and Factory/locale seats.
  * @returns the pending steering bubble.
  */
-export function PendingSteeringBubble({ content, loadImage, renderFactorySlot, t }: {
+export function PendingSteeringBubble({ content, loadImage, openFile, renderFactorySlot, t }: {
   content: readonly unknown[]
   renderFactorySlot: PropsRenderFactories['renderFactorySlot']
   t: ChatViewSlotProps['t']
-} & Pick<ChatNodeOwnerProps, 'loadImage'>): ReactNode {
+} & Pick<ChatNodeOwnerProps, 'loadImage' | 'openFile'>): ReactNode {
   return (
     <UserStyleBubble
       node={UNDECORATED_ROW}
@@ -253,6 +278,7 @@ export function PendingSteeringBubble({ content, loadImage, renderFactorySlot, t
       content={content}
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      openFile={openFile}
       pending
       actions={text => (
         <MessageIconActions
@@ -274,11 +300,11 @@ export function PendingSteeringBubble({ content, loadImage, renderFactorySlot, t
  * @param props - the pending submission, authorized image loader, and render seats.
  * @returns the echoed user bubble.
  */
-export function PendingSubmissionBubble({ submission, loadImage, renderFactorySlot, t }: {
+export function PendingSubmissionBubble({ submission, loadImage, openFile, renderFactorySlot, t }: {
   submission: PendingSubmission
   renderFactorySlot: PropsRenderFactories['renderFactorySlot']
   t: ChatViewSlotProps['t']
-} & Pick<ChatNodeOwnerProps, 'loadImage'>): ReactNode {
+} & Pick<ChatNodeOwnerProps, 'loadImage' | 'openFile'>): ReactNode {
   const content = useMemo(
     () => (submission.text === '' ? [] : [{ type: 'text', text: submission.text }]),
     [submission.text],
@@ -296,7 +322,11 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
           },
         },
       }
-      : { type: 'file', file: attachment.value }),
+      : attachment.type === 'file-reference'
+        ? { type: 'reference', reference: attachment.value }
+        : attachment.type === 'terminal-selection'
+          ? { type: 'terminal', terminal: attachment.value }
+          : { type: 'file', file: attachment.value }),
     [submission.attachments],
   )
   return (
@@ -307,6 +337,7 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
       previewAttachments={previewAttachments}
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      openFile={openFile}
       pending={submission.placement === 'steering'}
       echo
       actions={text => (
@@ -330,7 +361,7 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
  * bubble without asking for it.
  */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderFactorySlot, loadImage, renderSlotChain, t,
+  node, renderFactorySlot, loadImage, openFile, renderSlotChain, t,
 }: ChatNodeViewProps<'user' | 'steering'> & {
   /** Bound by the `user` keyed registration, the only entry that declares the seat. */
   renderSlotChain: PropsRenderSlots<'conversation.chat.user.before'>['renderSlotChain']
@@ -344,6 +375,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       interactive
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      openFile={openFile}
       batchStart={node.kind === 'steering' && node.data.batchStart === true}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}

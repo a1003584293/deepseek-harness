@@ -105,7 +105,7 @@ function codeProps(h: ReturnType<typeof harness>, navigation: { params?: unknown
   return {
     ...props,
     useDocumentPreviews: selector => selector([definition]),
-    renderSlot: documentSlots((_key, owner) => <CodeBody {...props} {...owner as unknown as OwnerOf<'sidebar.right.tab.document'>} t={key => key} />),
+    renderSlot: documentSlots((_key, owner) => <CodeBody {...props} {...owner as unknown as OwnerOf<'sidebar.right.tab.document'>} reportSelection={() => {}} clearSelection={() => {}} t={key => key} />),
   }
 }
 
@@ -516,7 +516,7 @@ describe('TextPreview — navigation and view', () => {
       useDocumentPreviews: selector => selector(definitions),
       renderSlot: documentSlots((_key, owner, opts) => {
         const documentOwner = owner as unknown as OwnerOf<'sidebar.right.tab.document'>
-        if (opts.entryKey === 'code' && codeDrawsLines) return <CodeBody {...base} {...documentOwner} t={key => key} />
+        if (opts.entryKey === 'code' && codeDrawsLines) return <CodeBody {...base} {...documentOwner} reportSelection={() => {}} clearSelection={() => {}} t={key => key} />
         if (opts.entryKey === PLAIN_BODY_ID) return <TextBody {...base} {...documentOwner} />
         return <div data-test-no-lines />
       }),

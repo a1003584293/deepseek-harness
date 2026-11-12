@@ -8,6 +8,20 @@ import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 export interface TerminalInjected {
   /** @param key - sidebar occurrence key. @returns its terminal commands. */
   readonly view: (key: string) => TerminalView
+  /**
+   * Open the shared context menu for one terminal selection.
+   * @param text - selected terminal text.
+   * @param cwd - the terminal's current directory, when known.
+   * @param point - viewport position of the gesture.
+   */
+  readonly openSelectionMenu: (text: string, cwd: string | undefined, point: { readonly x: number; readonly y: number }) => void
+  /**
+   * Register one mounted screen's selection reader.
+   * @param key - tab occurrence key.
+   * @param read - the reader; returns undefined when that screen has no selection.
+   * @returns the disposer removing the reader.
+   */
+  readonly registerSelectionReader: (key: string, read: () => { readonly text: string; readonly cwd?: string } | undefined) => () => void
   readonly keyedHooks: { readonly terminal: (key: string) => HostObservable<TerminalViewState> }
 }
 

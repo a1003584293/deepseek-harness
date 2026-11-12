@@ -144,6 +144,8 @@ Send 和 Stop 按钮禁用时不显示提示气泡，轮次结束后由 Stop 切
 
 在获得焦点的 Chat 或 Composer 中连续独立按下两次 Esc，可停止当前运行轮次并保留排队消息。间隔由 shortcuts 插件的 `stopSequenceMs` 配置决定，默认 500 ms。菜单、审批、模态层、终端、内嵌网页、输入法、重复按键，以及输入区域、Session 或轮次变化会清空序列。快捷键与 Stop 按钮调用同一作用域取消操作。插件将 Stop 注册为 `input` 展示分组中的固定操作。该注册使普通 Esc 不能分配给可编辑快捷键，并为 Stop 按钮的悬停和键盘聚焦提示提供 `Esc Esc` 序列。
 
+其他插件通过 `ctx.inputPins` 按 Session id 向输入框钉内容：`addReference` 添加带可选 1-based 行范围的文件路径，`addTerminalSelection` 添加终端选中文本及其捕获目录。两者都会注册一个草稿附件，输入框附件栏显示它，下一条普通消息把它作为结构化内容块发送；被拒绝的添加返回 `false` 且不留下草稿。命令不会消费钉住的引用：仍带引用的命令提交会明确失败，而不是静默丢弃。
+
 <a id="temporary-composer-entries"></a>
 ## 临时 composer entry
 

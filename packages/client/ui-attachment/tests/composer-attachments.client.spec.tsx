@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type {
   ComposerAttachment, ComposerAttachmentsOwnerProps, ComposerAttachmentsProps,
+  ComposerFileAttachment, ComposerImageAttachment, ComposerReferenceAttachment,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ComposerAttachments } from '../src/client/ComposerAttachments.tsx'
 
@@ -23,8 +24,6 @@ afterEach(() => {
 const t = ((key: string, params?: Readonly<Record<string, unknown>>): string => {
   const messages: Record<string, string> = {
     'attachment.pending': '待发送附件',
-    'attachment.scrollLeft': '向左滚动附件',
-    'attachment.scrollRight': '向右滚动附件',
     'file.pending': '待发送文件',
     'file.uploading': '上传中…',
     'file.uploadFailed': '上传失败，点击重试',
@@ -57,7 +56,7 @@ const t = ((key: string, params?: Readonly<Record<string, unknown>>): string => 
   return messages[key] ?? key
 }) as ComposerAttachmentsProps['t']
 
-function attachment(id: string, name = `${id}.png`): ComposerAttachment {
+function attachment(id: string, name = `${id}.png`): ComposerImageAttachment {
   return {
     kind: 'image',
     id: id as ComposerAttachment['id'],
@@ -66,11 +65,23 @@ function attachment(id: string, name = `${id}.png`): ComposerAttachment {
   }
 }
 
-function fileDraft(id: string, name = `${id}.pdf`): ComposerAttachment {
+function fileDraft(id: string, name = `${id}.pdf`): ComposerFileAttachment {
   return {
     kind: 'file',
     id: id as ComposerAttachment['id'],
     file: new File([Uint8Array.of(1, 2, 3)], name, { type: 'application/pdf' }),
+  }
+}
+
+function referenceDraft(
+  id: string, path = `src/${id}.py`, startLine?: number, endLine?: number,
+): ComposerReferenceAttachment {
+  return {
+    kind: 'reference',
+    id: id as ComposerReferenceAttachment['id'],
+    path,
+    ...startLine === undefined ? {} : { startLine },
+    ...endLine === undefined ? {} : { endLine },
   }
 }
 
@@ -303,6 +314,21 @@ describe('ComposerAttachments image uploads', () => {
 })
 
 describe('ComposerAttachments file drafts', () => {
+  it('renders a pinned reference with its line range and removes it', () => {
+    const onRemoveAttachment = vi.fn()
+    const view = render(<ComposerAttachments {...props({
+      attachments: [referenceDraft('range', 'api/invoice.py', 100, 120), referenceDraft('whole', 'api/other.py')],
+      onRemoveAttachment,
+    })} />)
+    const group = view.getByRole('group', { name: '待发送附件' })
+    expect(group.textContent).toContain('invoice.py')
+    expect(group.textContent).toContain('100-120')
+    expect(group.textContent).toContain('other.py')
+    fireEvent.click(view.getByRole('button', { name: '移除文件 invoice.py' }))
+    expect(onRemoveAttachment).toHaveBeenCalledWith('range')
+  })
+
+
   it('renders uploading, ready, and failed cards with remove and retry affordances', () => {
     const onRemoveAttachment = vi.fn()
     const onRetryFile = vi.fn()

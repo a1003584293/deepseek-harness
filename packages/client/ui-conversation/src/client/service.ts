@@ -22,7 +22,8 @@ import type { FileAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachm
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
-  ComposerAttachment, ComposerFileAttachment, ComposerImageAttachment, DraftFileUpload,
+  ComposerAttachment, ComposerFileAttachment, ComposerImageAttachment, ComposerReferenceAttachment,
+  ComposerTerminalAttachment, DraftFileUpload,
 } from './contract/slots.ts'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
@@ -267,9 +268,38 @@ export class ConversationController extends Service implements IConversation {
           ...(attachment.height === undefined ? {} : { height: attachment.height }),
         },
       }
-      : { type: 'file' as const, value: storedFileOf(attachment) })
+      : attachment.kind === 'reference'
+        ? {
+          type: 'file-reference' as const,
+          value: {
+            path: attachment.path,
+            ...(attachment.startLine === undefined ? {} : { startLine: attachment.startLine }),
+            ...(attachment.endLine === undefined ? {} : { endLine: attachment.endLine }),
+          },
+        }
+        : attachment.kind === 'terminal'
+          ? {
+            type: 'terminal-selection' as const,
+            value: { text: attachment.text, ...(attachment.cwd === undefined ? {} : { cwd: attachment.cwd }) },
+          }
+          : { type: 'file' as const, value: storedFileOf(attachment) })
     const serializeAttachments = (): Promise<Parameters<SessionFace['prompt']>[0]> => Promise.all(
       attachments.map(async (attachment) => {
+        if (attachment.kind === 'reference') {
+          return {
+            type: 'file-reference' as const,
+            path: attachment.path,
+            ...(attachment.startLine === undefined ? {} : { startLine: attachment.startLine }),
+            ...(attachment.endLine === undefined ? {} : { endLine: attachment.endLine }),
+          }
+        }
+        if (attachment.kind === 'terminal') {
+          return {
+            type: 'terminal-selection' as const,
+            text: attachment.text,
+            ...(attachment.cwd === undefined ? {} : { cwd: attachment.cwd }),
+          }
+        }
         if (attachment.kind === 'file') return { type: 'file' as const, receiptId: uploadFor(attachment).receiptId }
         const receiptId = imageReceipts.get(attachment.id)
         return receiptId === undefined
@@ -348,13 +378,52 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
+   * Register one pinned path reference as a draft attachment. The reference
+   * never uploads: submit serializes it into its structured content block.
+   * @param reference - session-workspace-relative or absolute path, with an optional 1-based line range.
+   * @returns the registered draft descriptor.
+   */
+  addReference(reference: {
+    readonly path: string
+    readonly startLine?: number
+    readonly endLine?: number
+  }): ComposerReferenceAttachment {
+    const attachment: ComposerReferenceAttachment = {
+      kind: 'reference',
+      id: randomUUID() as DraftAttachmentId,
+      path: reference.path,
+      ...reference.startLine === undefined ? {} : { startLine: reference.startLine },
+      ...reference.endLine === undefined ? {} : { endLine: reference.endLine },
+    }
+    this.draftAttachments.set(attachment.id, attachment)
+    return attachment
+  }
+
+  /**
+   * Register one pinned terminal selection as a draft attachment. The text never
+   * uploads: submit serializes it into its structured content block.
+   * @param selection - selected text and its capture directory.
+   * @returns the registered draft descriptor.
+   */
+  addTerminalSelection(selection: { readonly text: string; readonly cwd?: string }): ComposerTerminalAttachment {
+    const attachment: ComposerTerminalAttachment = {
+      kind: 'terminal',
+      id: randomUUID() as DraftAttachmentId,
+      text: selection.text,
+      ...selection.cwd === undefined ? {} : { cwd: selection.cwd },
+    }
+    this.draftAttachments.set(attachment.id, attachment)
+    return attachment
+  }
+
+  /**
    * Restart one failed file or image upload.
    * @param sessionId - target Agent-scope identity.
    * @param id - draft attachment id whose upload previously failed.
    */
   retryFileUpload(sessionId: SessionId, id: DraftAttachmentId): void {
     const attachment = this.draftAttachments.get(id)
-    if (attachment === undefined) return
+    if (attachment === undefined || attachment.kind === 'reference' || attachment.kind === 'terminal') return
     if (this.fileUploads.getSnapshot()[id]?.status !== 'error') return
     this.beginFileUpload(sessionId, attachment)
   }
@@ -368,13 +437,13 @@ export class ConversationController extends Service implements IConversation {
   rebindDraftFiles(sessionId: SessionId, ids: readonly DraftAttachmentId[], uploadImages: boolean): void {
     for (const id of ids) {
       const attachment = this.draftAttachments.get(id)
-      if (attachment === undefined) continue
+      if (attachment === undefined || attachment.kind === 'reference' || attachment.kind === 'terminal') continue
       if (attachment.kind === 'image' && !uploadImages) this.dropUpload(id)
       else this.beginFileUpload(sessionId, attachment)
     }
   }
 
-  private beginFileUpload(sessionId: SessionId, attachment: ComposerAttachment): void {
+  private beginFileUpload(sessionId: SessionId, attachment: ComposerImageAttachment | ComposerFileAttachment): void {
     this.fileUploadOperations.get(attachment.id)?.controller.abort()
     const controller = new AbortController()
     this.fileUploads.update((draft) => {
@@ -486,6 +555,10 @@ export class ConversationController extends Service implements IConversation {
     const uploads = this.fileUploads.getSnapshot()
     return {
       attachments: await Promise.all(attachments.map(async (attachment) => {
+        // Commands submit durable attachment receipts; pinned references have none.
+        if (attachment.kind === 'reference' || attachment.kind === 'terminal') {
+          throw new Error('conversation.serializeDraftAttachments: commands do not accept pinned references')
+        }
         if (attachment.kind === 'image') return { type: 'image' as const, ...await this.encodeImage(attachment.file) }
         const upload = uploads[attachment.id]
         if (upload === undefined || upload.status !== 'ready') {
@@ -597,6 +670,11 @@ export class ConversationController extends Service implements IConversation {
     const uiConversation = this.ctx.get('uiConversation')
     let observedIndex = 0
     for (const attachment of attachments) {
+      // Pinned references never become stored attachments, so they consume no observed index.
+      if (attachment.kind === 'reference' || attachment.kind === 'terminal') {
+        this.releaseDraftAttachment(attachment.id)
+        continue
+      }
       const live = this.draftAttachments.get(attachment.id)
       const ref = retirement.attachments[observedIndex++]
       if (live === undefined) continue

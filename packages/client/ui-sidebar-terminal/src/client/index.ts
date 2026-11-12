@@ -21,7 +21,16 @@ import type { TerminalBodyInjected, TerminalInjected } from './face.ts'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 
 /** Services needed by the terminal's two sidebar seats. */
-export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'webTerminals', 'theme', 'shortcuts']
+export const inject = [
+  'slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'webTerminals', 'theme', 'shortcuts', 'contextMenus',
+]
+
+declare module '@deepseek-ai/dsh-client-ui-context-menu/client' {
+  interface ContextMenuTargetMap {
+    /** One selected range of a sidebar terminal. */
+    terminal: { readonly sessionId: SessionId; readonly text: string; readonly cwd?: string }
+  }
+}
 
 /**
  * Register the terminal type, observable views and background process cleanup.
@@ -76,9 +85,57 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.sidebarRight.registerCloseHandler('terminal', (sessionId, tab) => {
     ctx.webTerminals.close(sessionId, tab.id, tab.contentId, terminalId(sessionId, tab.id))
   }), 'ui-sidebar-terminal.close')
+  ctx.effect(() => ctx.contextMenus.register({
+    id: 'sidebar-terminal.selection', target: 'terminal', order: 100,
+    resolve: target => [{
+      id: 'pin', label: t('pinSelection'),
+      run: () => {
+        ctx.get('inputPins')?.addTerminalSelection(target.sessionId, {
+          text: target.text,
+          ...target.cwd === undefined ? {} : { cwd: target.cwd },
+        })
+      },
+    }],
+  }), 'ui-sidebar-terminal: selection menu')
+  // Mounted screens register their xterm selection reader here so the keyboard
+  // pin gesture can use the focused terminal's selection without owning xterm.
+  const selectionReaders = new Map<string, () => { readonly text: string; readonly cwd?: string } | undefined>()
+  ctx.effect(() => ctx.shortcuts.register({
+    id: 'terminal.pinSelection' as ShortcutCommandId,
+    label: () => t('pinSelection'), aliases: ['pin terminal selection', 'attach terminal selection'],
+    // Desktop only: Web admits a short allowlist of combinations, and an
+    // unsupported Web default fails this whole plugin's registration.
+    defaults: {
+      'desktop:macos': { code: 'KeyK', modifiers: ['meta', 'shift'] },
+      'desktop:windows': { code: 'KeyK', modifiers: ['control', 'shift'] },
+      'desktop:linux': { code: 'KeyK', modifiers: ['control', 'shift'] },
+    },
+    regions: ['terminal'], modals: [],
+    resolve: ({ target }) => {
+      const sessionId = (target === null ? undefined : ctx.sidebarRight.commandTarget(target)?.sessionId)
+        ?? ctx.sidebarRight.mounted.getSnapshot()
+      if (sessionId === undefined) return { status: 'blocked', reason: t('shortcut.noSession') }
+      for (const read of selectionReaders.values()) {
+        const selection = read()
+        if (selection === undefined) continue
+        return {
+          status: 'handled',
+          run: () => { ctx.get('inputPins')?.addTerminalSelection(sessionId, selection) },
+        }
+      }
+      return { status: 'blocked', reason: t('pinSelectionEmpty') }
+    },
+  }), 'ui-sidebar-terminal: pin selection shortcut')
   const inject = (sessionId: SessionId): TerminalInjected => ({
     view: key => view(sessionId, key),
     keyedHooks: { terminal: key => view(sessionId, key).state },
+    openSelectionMenu: (text, cwd, point) => {
+      ctx.contextMenus.open({ kind: 'terminal', value: { sessionId, text, ...cwd === undefined ? {} : { cwd } } }, point)
+    },
+    registerSelectionReader: (key, read) => {
+      selectionReaders.set(key, read)
+      return () => { if (selectionReaders.get(key) === read) selectionReaders.delete(key) }
+    },
   })
   const theme: TerminalBodyInjected['hooks']['theme'] = {
     getSnapshot: () => ctx.theme.getTheme(),

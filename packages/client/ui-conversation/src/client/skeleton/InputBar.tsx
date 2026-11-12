@@ -455,6 +455,21 @@ export const InputBar = memo(function InputBar({
           their pointer events), so the WHOLE capsule is the pick target.
           pointerdown stops here so the Menu's outside-close cannot race the
           click's reopen (close-then-open flickers the chip's open echo). */}
+      {/* Drafts sit above the card, not inside it: a chip must never push the
+          text line down, so the caret keeps its top-left seat. */}
+      {renderSlot('conversation.input.attachments', {
+        attachments,
+        canAcceptDrop,
+        onAddFiles: intakeFiles,
+        onRemoveAttachment: (id) => { removeAttachment?.(id) },
+        uploads,
+        onRetryFile: (id) => { retryFileUpload?.(id) },
+        uploadFailureText: reason => attachmentErrorText(t, reason, imageLimits),
+        dropLimits: imageLimits === undefined ? undefined : {
+          count: imageLimits.maxImagesPerMessage,
+          size: imageSizeText(imageLimits.maxImageBytes),
+        },
+      })}
       <div
         ref={cardRef}
         tabIndex={-1}
@@ -468,19 +483,6 @@ export const InputBar = memo(function InputBar({
           <div className={css.overlayAnchor} data-composer-overlay>{renderSlot('conversation.input.overlay', {})}</div>
         )}
         {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}
-        {renderSlot('conversation.input.attachments', {
-          attachments,
-          canAcceptDrop,
-          onAddFiles: intakeFiles,
-          onRemoveAttachment: (id) => { removeAttachment?.(id) },
-          uploads,
-          onRetryFile: (id) => { retryFileUpload?.(id) },
-          uploadFailureText: reason => attachmentErrorText(t, reason, imageLimits),
-          dropLimits: imageLimits === undefined ? undefined : {
-            count: imageLimits.maxImagesPerMessage,
-            size: imageSizeText(imageLimits.maxImageBytes),
-          },
-        })}
         {/* One scrollport, one text surface: the contenteditable grows with
             its content and .scroll — capped at 14 lines in CSS — is the only
             thing that scrolls. Chips are decorator portals inside the same
