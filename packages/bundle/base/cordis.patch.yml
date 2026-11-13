@@ -21,16 +21,13 @@
       name: '@deepseek-ai/dsh-plugin-manager'
       disabled: !!js "!ctx.get('profileContext')"
 
-    # Inert until a command is configured; the profile settings edit its config.
+    # Inert until a command is configured; blank commands do nothing.
     - id: notify-command
       name: '@deepseek-ai/dsh-notify-command'
       config:
         onWaiting: ''
         onTurnEnd: ''
         onError: ''
-        timeoutMs: 10000
-        shell: /bin/sh
-        cwd: ''
 
     - id: timer
       name: '@deepseek-ai/cordis-plugin-timer'

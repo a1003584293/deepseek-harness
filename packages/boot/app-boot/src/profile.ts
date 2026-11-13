@@ -171,10 +171,29 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
   return join(home, PROFILES_DIR, name)
 }
 
+/** The empty patch layer for a profile whose bundles do not mount the base bundle. */
 const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this dsh profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; \`!!js\` expressions allowed).
 []
+`
+
+/**
+ * The patch layer for a base-backed profile: the notification row is present
+ * and inert until a command is filled in, so the configuration surface is
+ * discoverable without copying package names or defaults.
+ */
+const PROFILE_PATCH_BASE_TEMPLATE = `# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; \`!!js\` expressions allowed).
+
+# Notifications: fill in a command for each moment you want to hear about.
+# A blank command disables that moment; timeoutMs and shell keep their defaults.
+- id: notify-command
+  config:
+    onWaiting: ''
+    onTurnEnd: ''
+    onError: ''
 `
 
 // The hoisted linker gives out-of-tree plugins a flat node_modules whose
@@ -211,7 +230,8 @@ export function initProfile(
     writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
   }
   const patchPath = join(dir, PROFILE_PATCH_FILENAME)
-  if (!existsSync(patchPath)) writeFileSync(patchPath, PROFILE_PATCH_TEMPLATE)
+  const patchTemplate = bundles.includes('@deepseek-ai/dsh-base') ? PROFILE_PATCH_BASE_TEMPLATE : PROFILE_PATCH_TEMPLATE
+  if (!existsSync(patchPath)) writeFileSync(patchPath, patchTemplate)
   const workspacePath = join(dir, 'pnpm-workspace.yaml')
   if (!existsSync(workspacePath)) writeFileSync(workspacePath, PROFILE_PNPM_WORKSPACE)
 }

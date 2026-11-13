@@ -23,15 +23,17 @@ Runs up to three operator-configured commands at the moments an agent needs atte
 ## Use this package
 <a id="use-this-package"></a>
 
-Mounted in a Host profile; the commands are the whole configuration.
+Mounted in a Host profile; the commands are the whole configuration. A base-backed profile carries the row with blank commands, so an override targets its row id and states only the commands:
 
 ```yaml
-- name: '@deepseek-ai/dsh-notify-command'
+- id: notify-command
   config:
-    onWaiting: 'python /Users/me/notify.py waiting'
-    onTurnEnd: 'python /Users/me/notify.py stop'
-    onError: 'python /Users/me/notify.py error'
+    onWaiting: 'python /Users/me/notify.py'
+    onTurnEnd: 'python /Users/me/notify.py'
+    onError: 'python /Users/me/notify.py'
 ```
+
+`id` is the Loader row this override targets; `name` is needed only when a patch inserts the plugin instead of overriding an existing row. The script reads `hook_event_name` from stdin, so the command line needs no event argument. A blank command disables its moment, and `timeoutMs`, `shell`, and `cwd` keep the defaults below when omitted.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -40,9 +42,9 @@ Mounted in a Host profile; the commands are the whole configuration.
 | `onError` | `''` | Command for a turn-level failure; blank disables it |
 | `timeoutMs` | `10000` | Deadline after which the managed process is terminated |
 | `shell` | `/bin/sh` | Shell that runs the command line with `-c` |
-| `cwd` | `''` | Fallback working directory when the Session has none; blank uses the Host process directory |
+| `cwd` | `''` | Fallback working directory when the Session has none; blank uses the Host process directory. Normal Sessions never need it |
 
-The payload carries the Claude Code hook names VS Code writes — `hook_event_name` (`Notification`, `Stop`, or `ErrorOccurred`) and `session_id` — so one notification script reads both producers; a failure also carries `error.message` as serialized JSON. It repeats the DSH-native `event` (`waiting`, `turn-end`, or `error`), `sessionId`, `cwd`, and `time`, plus event-specific fields: `kind`, `tool`, and `reason` for a wait, `turn` for turn end, and `turn`, `step`, `message`, and `error` for a failure. `DSH_NOTIFY_EVENT` and `DSH_NOTIFY_SESSION` are also exported. A failed start, nonzero exit, or timeout is logged and never reaches the model or the user.
+The payload carries the Claude Code hook names VS Code writes — `hook_event_name` (`Notification`, `Stop`, or `ErrorOccurred`) and `session_id` — so one notification script reads both producers; `ds_harness: 1` marks this producer, because VS Code never sends it. A failure also carries `error.message` as serialized JSON. It repeats the DSH-native `event` (`waiting`, `turn-end`, or `error`), `sessionId`, `cwd`, and `time`, plus event-specific fields: `kind`, `tool`, and `reason` for a wait, `turn` for turn end, and `turn`, `step`, `message`, and `error` for a failure. `DSH_NOTIFY_EVENT` and `DSH_NOTIFY_SESSION` are also exported. A failed start, nonzero exit, or timeout is logged and never reaches the model or the user.
 
 ## Model Experience
 

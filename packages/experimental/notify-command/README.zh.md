@@ -23,15 +23,17 @@ kind: "package-reference"
 ## 使用此包
 <a id="use-this-package"></a>
 
-在 Host profile 中挂载；命令就是全部配置。
+在 Host profile 中挂载；命令就是全部配置。基于 base 的 profile 已经带有命令行，空命令即可，因此覆盖时按行 id 定位，只写命令：
 
 ```yaml
-- name: '@deepseek-ai/dsh-notify-command'
+- id: notify-command
   config:
-    onWaiting: 'python /Users/me/notify.py waiting'
-    onTurnEnd: 'python /Users/me/notify.py stop'
-    onError: 'python /Users/me/notify.py error'
+    onWaiting: 'python /Users/me/notify.py'
+    onTurnEnd: 'python /Users/me/notify.py'
+    onError: 'python /Users/me/notify.py'
 ```
+
+`id` 是这次覆盖要定位的 Loader 行；只有 patch 要新增该插件时才需要 `name`。脚本从 stdin 读取 `hook_event_name`，所以命令行不需要再传事件参数。命令留空即关闭该时刻；省略 `timeoutMs`、`shell`、`cwd` 时使用下表的默认值。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -40,9 +42,9 @@ kind: "package-reference"
 | `onError` | `''` | 任务失败时的命令；留空即关闭 |
 | `timeoutMs` | `10000` | 超过该时限后终止托管进程 |
 | `shell` | `/bin/sh` | 用 `-c` 执行命令行的 shell |
-| `cwd` | `''` | Session 没有工作目录时的回退目录；留空使用 Host 进程目录 |
+| `cwd` | `''` | Session 没有工作目录时的回退目录；留空使用 Host 进程目录。正常 Session 不需要它 |
 
-载荷同时携带 VS Code 写入的 Claude Code hook 字段——`hook_event_name`（`Notification`、`Stop` 或 `ErrorOccurred`）与 `session_id`，因此同一个通知脚本可以读取两种来源；失败时还带序列化为 JSON 字符串的 `error.message`。此外重复 DSH 自有字段 `event`（`waiting`、`turn-end` 或 `error`）、`sessionId`、`cwd`、`time`，以及事件相关字段：等待时的 `kind`、`tool`、`reason`，回答结束时的 `turn`，失败时的 `turn`、`step`、`message`、`error`。同时导出 `DSH_NOTIFY_EVENT` 与 `DSH_NOTIFY_SESSION`。启动失败、非零退出或超时只写日志，不会送到模型或用户界面。
+载荷同时携带 VS Code 写入的 Claude Code hook 字段——`hook_event_name`（`Notification`、`Stop` 或 `ErrorOccurred`）与 `session_id`，因此同一个通知脚本可以读取两种来源；`ds_harness: 1` 标记本来源，VS Code 不会发送它。失败时还带序列化为 JSON 字符串的 `error.message`。此外重复 DSH 自有字段 `event`（`waiting`、`turn-end` 或 `error`）、`sessionId`、`cwd`、`time`，以及事件相关字段：等待时的 `kind`、`tool`、`reason`，回答结束时的 `turn`，失败时的 `turn`、`step`、`message`、`error`。同时导出 `DSH_NOTIFY_EVENT` 与 `DSH_NOTIFY_SESSION`。启动失败、非零退出或超时只写日志，不会送到模型或用户界面。
 
 ## Model Experience
 

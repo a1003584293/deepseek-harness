@@ -94,6 +94,9 @@ function notify(
     hook_event_name: HOOK_EVENT_NAME[event],
     session_id: String(agent.session.id),
     cwd,
+    // A producer marker for scripts that must tell this Host from VS Code:
+    // VS Code's hook payload never carries it.
+    ds_harness: 1,
     // DSH-native duplicates of the same facts, kept for scripts that already use them.
     event,
     sessionId: String(agent.session.id),

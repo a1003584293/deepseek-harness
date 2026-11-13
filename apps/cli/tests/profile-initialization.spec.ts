@@ -75,7 +75,8 @@ describe('initializeProfileFromDefault', () => {
           dependencies: {},
           dsh: { profile: { bundles: [...template.bundles] } },
         })
-        expect(readFileSync(join(dir, PROFILE_PATCH_FILENAME), 'utf8')).toContain('[]')
+        expect(readFileSync(join(dir, PROFILE_PATCH_FILENAME), 'utf8'))
+          .toContain(template.bundles.includes('@deepseek-ai/dsh-base') ? 'notify-command' : '[]')
         expect(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8')).toContain('nodeLinker: hoisted')
       })
     },

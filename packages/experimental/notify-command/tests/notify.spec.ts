@@ -72,11 +72,13 @@ describe('notify-command', () => {
       event: 'error', sessionId: SESSION, cwd: '/work', turn: 2, step: 3,
       // VS Code hook fields: one script can read both producers.
       hook_event_name: 'ErrorOccurred', session_id: SESSION,
+      // The producer marker VS Code never sends.
+      ds_harness: 1,
     })
     expect(String(payload.message)).toContain('boom')
     // VS Code serializes the provider message into error.message, which the
     // operator script decodes with json.loads.
-    const providerError = JSON.parse(String((payload.error as { message: string }).message)) as { message: string }
+    const providerError = JSON.parse((payload.error as { message: string }).message) as { message: string }
     expect(providerError.message).toContain('boom')
   })
 

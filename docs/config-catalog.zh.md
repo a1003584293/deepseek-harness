@@ -264,7 +264,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-session-controller`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `fileUploads` · `fs` · `llm` · `remoteAccess` · `sessions` · `sessionProjections` · `sessionQuery` · `typert` · `typertGateway` · `workspaceRegistry`
-- `source`: [`packages/api/session-controller/src/index.ts:111`](../packages/api/session-controller/src/index.ts)
+- `source`: [`packages/api/session-controller/src/index.ts:113`](../packages/api/session-controller/src/index.ts)
 
 ```ts config-catalog
 /** Session Controller deployment policy. */
@@ -2643,6 +2643,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-message-feedback -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-notify-command -->
+<a id="deepseek-aidsh-notify-command"></a>
+
+## `@deepseek-ai/dsh-notify-command`
+
+- `inject`: `subprocess`
+- `source`: [`packages/experimental/notify-command/src/index.ts:31`](../packages/experimental/notify-command/src/index.ts)
+
+```ts config-catalog
+/** Plugin config: one command line per moment plus the shared execution policy. */
+export interface Config {
+  /** Command for a pending approval or user question; blank disables it. */
+  onWaiting: string
+  /** Command for the turn-end boundary; blank disables it. */
+  onTurnEnd: string
+  /** Command for a turn-level failure; blank disables it. */
+  onError: string
+  /** Deadline after which the command's managed process is terminated. */
+  timeoutMs: number
+  /** Shell that runs the command line (`-c`). */
+  shell: string
+  /** Fallback working directory when the Session has none; blank uses the Host process directory. */
+  cwd: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-notify-command -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-office-kit -->
 <a id="deepseek-aidsh-office-kit"></a>
