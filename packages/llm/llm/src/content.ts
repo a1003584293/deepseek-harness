@@ -5,7 +5,7 @@ import type {
 } from './types.ts'
 import type { RequestMessage } from './types.ts'
 import type { Message } from './message.ts'
-import type { MessageId } from './brand.ts'
+import type { MessageId } from './types.ts'
 import type {
   AttachmentStore, FileAttachmentRef, ImageAttachmentRef, ImageMediaType, RequestImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
