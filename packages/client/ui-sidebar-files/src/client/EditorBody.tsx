@@ -10,10 +10,10 @@ import type { ReactNode } from 'react'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceFileDocument, WorkspaceFileWrite } from '@deepseek-ai/dsh-api-workspace-files'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { SidebarRightTabDefinition, SidebarTextSelection } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { FileTypeIcon, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
-import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
+import { parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { loadMonacoLanguage, monaco } from './monaco-api.ts'
 import type { MonacoEditor } from './monaco-api.ts'
 import css from './EditorBody.module.css'
@@ -58,6 +58,10 @@ export interface EditorInjected {
   readonly pathFor: (contentId: string) => string | undefined
   /** Remember the address this editor content opened. */
   readonly rememberPath: (contentId: string, path: string) => void
+  /** Publish the current whole-line code selection to the composer indicator. */
+  readonly reportSelection: (selection: SidebarTextSelection) => void
+  /** Clear a selection that belongs to this editor. */
+  readonly clearSelection: (selection: { readonly sessionId: SidebarTextSelection['sessionId']; readonly address: string }) => void
 }
 
 /** Standard tab seat, namespace copy, and the complete-file operations. */
@@ -138,10 +142,13 @@ function darkTheme(): boolean {
  * @param props - the tab occurrence, namespace copy, and complete-file operations.
  * @returns the editor header above the Monaco surface.
  */
-export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, rememberPath, t }: EditorBodyProps): ReactNode {
+export function EditorBody({
+  sessionId, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection, t,
+}: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
   const path = parseFileAddress(address)?.path ?? address
+  const fileAddress = address.startsWith('dsh-resource://file/') ? address : sessionFileAddress(sessionId, path)
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
   const [language, setLanguage] = useState(() => languageOf(path))
@@ -247,6 +254,7 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
     let model: ReturnType<typeof api.editor.createModel> | undefined
     let editor: ReturnType<typeof api.editor.create> | undefined
     let change: { dispose(): void } | undefined
+    let select: { dispose(): void } | undefined
     const keydown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault()
@@ -275,6 +283,20 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
         setText(value)
         setDirty(value !== savedText.current)
       })
+      const report = (): void => {
+        const selection = created.getSelection()
+        if (selection === null || (selection.startLineNumber === selection.endLineNumber
+          && selection.startColumn === selection.endColumn)) {
+          clearSelection({ sessionId, address: fileAddress })
+          return
+        }
+        const endLine = selection.endColumn === 1 && selection.endLineNumber > selection.startLineNumber
+          ? selection.endLineNumber - 1
+          : selection.endLineNumber
+        reportSelection({ sessionId, address: fileAddress, startLine: selection.startLineNumber, endLine })
+      }
+      select = created.onDidChangeCursorSelection(report)
+      report()
       created.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.KeyS, () => { saveRef.current() })
     }).catch((cause: unknown) => {
       if (!cancelled) setError(tRef.current('editor.readFailed', { message: cause instanceof Error ? cause.message : String(cause) }))
@@ -282,9 +304,11 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
     return () => {
       cancelled = true
       host.removeEventListener('keydown', keydown, true)
+      select?.dispose()
       change?.dispose()
       editor?.dispose()
       model?.dispose()
+      clearSelection({ sessionId, address: fileAddress })
       editorRef.current = undefined
     }
   }, [document, path])

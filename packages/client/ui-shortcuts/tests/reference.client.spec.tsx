@@ -113,6 +113,14 @@ it.each(['macos', 'windows'] as const)('shows the reference, filters labels and 
   act(() => { catalog.set([]) })
   expect(opener.hasAttribute('aria-keyshortcuts')).toBe(false)
   expect(makeTranslate(zh)('title')).toBe('快捷键')
+  // The settings section embeds the same reference without a second click,
+  // dialog, or close control.
+  cleanup()
+  render(<ShortcutReference {...props} inline />)
+  expect(screen.getByRole('searchbox')).toBeTruthy()
+  expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('button', { name: en.close })).toBeNull()
 })
 
 

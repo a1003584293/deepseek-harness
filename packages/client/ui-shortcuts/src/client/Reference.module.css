@@ -64,6 +64,9 @@
 }
 .dialog:focus { outline: none; }
 .contents { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* The settings section is the reference page itself; give its list a stable
+ * viewport while the settings options column scrolls around it. */
+.sectionPane { display: flex; flex-direction: column; height: 540px; min-height: 0; }
 .header {
   position: relative;
   flex: 0 0 46px;

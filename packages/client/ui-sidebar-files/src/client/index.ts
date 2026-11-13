@@ -250,6 +250,18 @@ export function apply(ctx: ClientContext): void {
       const current = editorPaths.getSnapshot()
       if (current[contentId] !== path) editorPaths.set({ ...current, [contentId]: path })
     },
+    reportSelection: (selection) => {
+      const sidebar = ctx.get('sidebarRight') as {
+        setTextSelection(selection: unknown): void
+      } | undefined
+      sidebar?.setTextSelection(selection)
+    },
+    clearSelection: (selection) => {
+      const sidebar = ctx.get('sidebarRight') as {
+        clearTextSelection(sessionId: unknown, address: string): void
+      } | undefined
+      sidebar?.clearTextSelection(selection.sessionId, selection.address)
+    },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')

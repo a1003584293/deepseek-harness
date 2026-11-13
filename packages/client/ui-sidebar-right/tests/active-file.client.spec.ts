@@ -22,6 +22,18 @@ describe('active file', () => {
     expect(h.controller.activeFile.getSnapshot()?.startLine).toBeUndefined()
   })
 
+  it('follows a page editor tab through its resource param and selection', () => {
+    const h = controllerHarness()
+    h.tabs.register({ id: 'test/editor', kind: 'editor', priority: 'builtin', title: () => 'Editor' })
+    h.publish()
+    h.controller.openTab('editor' as never, { params: { path: ADDRESS } } as never)
+    expect(h.controller.activeFile.getSnapshot()).toMatchObject({
+      sessionId: SESSION, address: ADDRESS, path: 'api/invoice.py',
+    })
+    h.controller.setTextSelection({ sessionId: SESSION, address: ADDRESS, startLine: 3, endLine: 7 })
+    expect(h.controller.activeFile.getSnapshot()).toMatchObject({ startLine: 3, endLine: 7 })
+  })
+
   it('drops the file when the focused tab is not a file resource', () => {
     const h = controllerHarness()
     h.publish()

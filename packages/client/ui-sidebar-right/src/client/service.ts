@@ -423,16 +423,24 @@ export class SidebarRightController implements ISidebarRight {
     const pane = layout === undefined ? undefined : layout.nodes[layout.activePaneId]
     const tabId = pane?.kind === 'pane' ? pane.activeTabId : undefined
     const occurrence = tabId === undefined ? undefined : this.tabDomain.occurrence(sessionId, { id: tabId })
-    const address = occurrence?.navigation.getSnapshot().address
-    const parsed = address === undefined ? undefined : parseFileAddress(address)
+    const navigation = occurrence?.navigation.getSnapshot()
+    const address = navigation?.address
+    // A page tab (the file editor) carries its resource address in navigation
+    // params, not in the page address; prefer that so the composer's active-file
+    // chip follows an editor tab too.
+    const params = navigation?.params as { readonly path?: unknown } | undefined
+    const candidate = address !== undefined && parseFileAddress(address) !== undefined
+      ? address
+      : typeof params?.path === 'string' ? params.path : undefined
+    const parsed = candidate === undefined ? undefined : parseFileAddress(candidate)
     const selection = this.textSelection.getSnapshot()
     const range = parsed !== undefined && selection !== undefined
-      && selection.sessionId === sessionId && selection.address === address
+      && selection.sessionId === sessionId && selection.address === candidate
       ? selection
       : undefined
-    const next: SidebarActiveFile | undefined = parsed === undefined ? undefined : {
+    const next: SidebarActiveFile | undefined = parsed === undefined || candidate === undefined ? undefined : {
       sessionId,
-      address: address as string,
+      address: candidate,
       path: parsed.path,
       ...range === undefined ? {} : { startLine: range.startLine, endLine: range.endLine },
     }

@@ -53,7 +53,7 @@ The General section holds the built-in Coding Tools and Current version rows alo
 
 ### Opening the configuration file
 
-On a loopback browser, the shell renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action asks the Host for the document's absolute path and opens that path in the built-in Monaco editor tab; no native text editor is launched. Remote browsers never register this action, including on configured public deployments; their preferences persist through the Host settings service.
+On a loopback browser, the shell renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action asks the Host for the document's absolute path and opens that path in the built-in Monaco editor tab; no native text editor is launched. On a fresh profile the Host creates a valid empty patch (a header comment and `[]`) before returning the path, so the action opens a real document on first install. Remote browsers never register this action, including on configured public deployments; their preferences persist through the Host settings service.
 
 ### Onboarding steps
 

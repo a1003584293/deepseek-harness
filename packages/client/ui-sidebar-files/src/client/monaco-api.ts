@@ -12,11 +12,20 @@ export interface MonacoModel {
 }
 
 /** One plain code editor. */
+export interface MonacoSelection {
+  readonly startLineNumber: number
+  readonly startColumn: number
+  readonly endLineNumber: number
+  readonly endColumn: number
+}
+
 export interface MonacoEditor {
   setModel(model: MonacoModel | null): void
   getModel(): MonacoModel | null
   getValue(): string
+  getSelection(): MonacoSelection | null
   onDidChangeModelContent(listener: () => void): { dispose(): void }
+  onDidChangeCursorSelection(listener: () => void): { dispose(): void }
   addCommand(keybinding: number, handler: () => void): string | null
   updateOptions(options: Record<string, unknown>): void
   layout(): void

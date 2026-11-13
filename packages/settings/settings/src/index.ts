@@ -1,7 +1,7 @@
 /** Config-schema projection and form edits over Cordis profile patches. */
 import { existsSync } from 'node:fs'
-import { readFile, rename } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { parse } from 'yaml'
 import { Context, FiberState, Service, resolveConfig, type Fiber } from '@deepseek-ai/cordis'
 import type z from '@deepseek-ai/schemastery'
@@ -290,10 +290,22 @@ export class SettingsForms extends Service {
   get writable(): boolean { return true }
   /** Current profile patch shown by the native configuration editor. */
   get documentPath(): string { return this.ownerContext.configEditor.documentPath }
-  /** Locate the profile patch for native editing.
-   * @returns The existing profile patch path.
+  /** Locate the profile patch, creating a valid empty patch on first use.
+   * @returns The profile patch path.
    */
-  prepareDocument(): Promise<string> { return Promise.resolve(this.documentPath) }
+  async prepareDocument(): Promise<string> {
+    const path = this.documentPath
+    if (!existsSync(path)) {
+      await mkdir(dirname(path), { recursive: true })
+      try {
+        await writeFile(path, '# Profile configuration patch. Entries override the active bundle.\n[]\n', { encoding: 'utf8', flag: 'wx' })
+      } catch (error: unknown) {
+        // Another window may have created the same fresh profile first.
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      }
+    }
+    return path
+  }
 
   /** Read active plugin schemas and their live values.
    * @param options Redaction required for remote callers.

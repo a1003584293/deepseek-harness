@@ -1,5 +1,6 @@
 /** Remote form operations over real Cordis profile configuration. */
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { rm, stat } from 'node:fs/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { remoteErrorOf, remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import SettingsController from '../src/index.ts'
@@ -50,6 +51,16 @@ describe('settings Remote', () => {
     const { controller, profile } = await boot()
     await expect(controller.prepareSettingsDocument(new AbortController().signal))
       .resolves.toEqual({ path: profile.patchPath })
+  })
+
+  it('materializes the profile patch for a fresh install instead of requiring an existing file', async () => {
+    const fixture = await configurationFixture()
+    await rm(fixture.profile.patchPath, { force: true })
+    await fixture.ctx.plugin(SettingsController)
+    const controller = fixture.ctx.settingsController
+    const prepared = await controller.prepareSettingsDocument(new AbortController().signal)
+    expect((await stat(prepared.path)).isFile()).toBe(true)
+    expect(controller.describe()).toMatchObject({ hasDocument: true })
   })
 
   it('opens the profile patch and contains opener failure and cancellation', async () => {
