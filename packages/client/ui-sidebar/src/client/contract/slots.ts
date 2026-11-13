@@ -219,6 +219,8 @@ export type SidebarRootInjected = {
   startSession: (workspaceId?: WorkspaceId) => void
   /** Toggle the sidebar column through the layout service. */
   toggleSidebar: () => void
+  /** Open the source-control page in the right sidebar when that surface is mounted. */
+  openSourceControl: () => void
   /** Select the global panel addressed by a sidebar row. */
   selectPanel: (id: MainPanelId) => void
   /**

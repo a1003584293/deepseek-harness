@@ -31,6 +31,7 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Remote, RemoteError, TypertRemoteService, type TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import { WorkspaceChangeFeed } from './changes.ts'
+import { GitPanel } from './git-panel.ts'
 import { searchWorkspace, type SearchLimits } from './search.ts'
 import type {
   WorkspaceByteRange,
@@ -46,6 +47,7 @@ import type {
   WorkspaceFileWatchFrame,
 } from './types.ts'
 
+export { GitPanel, gitEntryStaged, gitEntryUnstaged, gitEntryUntracked, parseGitStatus } from './git-panel.ts'
 export type * from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -212,6 +214,8 @@ export class WorkspaceFiles extends TypertRemoteService {
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'workspaceFiles')
     this.feed = new WorkspaceChangeFeed(ctx)
+    // The source-control panel shares this package's Session scope and process seam.
+    ctx.plugin(GitPanel)
     ctx.inject(['sessions', 'typert'], (scope) => {
       scope.typert.lookups.register('workspaceFileScope', {
         parameter: 'workspaceFileScope',

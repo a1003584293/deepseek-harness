@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用本包可从 Web Client 预览 Session 文件系统允许读取的文件。它按页读取 UTF-8 文本、按有界窗口或完整文件读取原始字节、从基文件目录解析关联文件，并报告文件元数据。可以跟随一个文件或一个目录直接子项的变化。可以按名称或相对路径搜索工作区条目。文件读取和监听可以指向工作区外路径；目录列举、搜索和目录监听仍限定于工作区。本服务不提供修改操作。
+使用本包可从 Web Client 预览 Session 文件系统允许读取的文件。它按页读取 UTF-8 文本、按有界窗口或完整文件读取原始字节、从基文件目录解析关联文件，并报告文件元数据。可以跟随一个文件或一个目录直接子项的变化。可以按名称或相对路径搜索工作区条目。文件读取和监听可以指向工作区外路径；目录列举、搜索和目录监听仍限定于工作区。同一包还挂载桌面源代码管理页所用的 `gitPanel` 命名空间：仓库状态、单个文件的统一 diff，以及索引的暂存/取消暂存。文件读取面不提供修改；只有 Git 命名空间会修改索引。
 
 ## 目录
 
@@ -67,6 +67,19 @@ kind: "package-reference"
 
 `changes` 是 `stream` 模式的 Remote，只接受目标路径。Host 从 `stat` 取得实际目标类型；只要当前类型是目录，就要求位于工作区内，目标类型变化后也执行该检查。一代流先注册观察队列、解析目标并建立 `fs.watch`，然后产出 `{ kind: 'ready' }`。随后产出 `{ kind: 'change', change }`，其中 `change` 为当前 stat 元数据 `{ absolutePath, version }` 或 `{ absolutePath, absent: true }`。本地提供方使用 Chokidar，目录仅监听直接子项。匹配目标的 `fs/observed` 也触发失效。流在初始化期间排队变化。取消会独立于消费方拉取帧的进度关闭 watcher，流或插件拆除等待关闭完成。父目录保持存在时，缺失文件仍可监听同一路径的重建。
 
+### 源代码管理
+
+本包在 `WorkspaceFiles` 旁挂载 `GitPanel`，注入 `sessions` 与 `subprocess`。其 Session 作用域 `gitPanel` 命名空间在 Session 工作区执行仅含参数、无 shell 的 Git 命令，输出有界、带截止时间：
+
+| 方法 | 返回 | 用途 |
+|---|---|---|
+| `gitPanel/status` | `GitStatusValue { root, branch, entries }` | 仓库根、分支（游离 HEAD 时为 null），以及每个路径的索引/工作树状态字母 |
+| `gitPanel/diff` | `GitDiffValue { path, scope, patch, binary, truncated }` | 统一 diff：`working`（索引对工作树，未跟踪文件与空树比较）或 `staged`（HEAD 对索引） |
+| `gitPanel/stage` | `void` | `git add -A -- <paths>` |
+| `gitPanel/unstage` | `void` | `git reset -- <paths>`；首次提交前使用 `git rm --cached` |
+
+路径均为仓库相对路径，并且只在 `--` 之后传给 Git。启动失败、非零退出、超时、Session 无工作区或目录不是仓库都会返回类型化的 `git-panel/*` 失败。该命名空间只通过这两个方法修改索引，绝不写工作树文件内容。
+
 ### 配置
 
 | 字段 | 默认值 | 含义 |
@@ -85,7 +98,7 @@ kind: "package-reference"
 
 ### 失败
 
-每种失败都是一个带类型化 details 的 `RemoteError` 代码，声明于 [`src/types.ts`](src/types.ts)：`workspace-file/not-found`、`workspace-file/outside-workspace`（目录列举或监听）、`workspace-file/watch-unsupported`（监听初始化失败）、`workspace-file/too-large`（带 `limit`，即适用的页、窗口或完整文件上限）、`workspace-file/not-text`、`workspace-file/not-regular-file`（`kind` 为 `directory`、`symlink` 或 `other`）以及 `workspace-file/not-directory`（`kind` 为 `file`、`symlink` 或 `other`）。调用方按代码分支，绝不按消息文本。
+每种失败都是一个带类型化 details 的 `RemoteError` 代码，声明于 [`src/types.ts`](src/types.ts)：`workspace-file/not-found`、`workspace-file/outside-workspace`（目录列举或监听）、`workspace-file/watch-unsupported`（监听初始化失败）、`workspace-file/too-large`（带 `limit`，即适用的页、窗口或完整文件上限）、`workspace-file/not-text`、`workspace-file/not-regular-file`（`kind` 为 `directory`、`symlink` 或 `other`）`workspace-file/not-directory`（`kind` 为 `file`、`symlink` 或 `other`），以及 Git 命名空间的 `git-panel/not-a-repository`、`git-panel/bad-request`、`git-panel/no-workspace`、`git-panel/timeout`、`git-panel/command-failed`。调用方按代码分支，绝不按消息文本。
 
 ### Client 文件资源
 

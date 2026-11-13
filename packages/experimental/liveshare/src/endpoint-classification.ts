@@ -88,6 +88,10 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'account/getState': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/getNotificationContent': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/getNotifications': 'owner-only', // owner account and sign-in; the served page never reads it
+  'gitPanel/diff': 'owner-only', // owner working tree; a share viewer never reads it
+  'gitPanel/stage': 'owner-only', // owner index mutation
+  'gitPanel/status': 'owner-only', // owner repository state; a share viewer never runs Git
+  'gitPanel/unstage': 'owner-only', // owner index mutation
   'account/reportNotificationEvent': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/hasRunningAccountTasks': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/signOut': 'owner-only', // owner account and sign-in; the served page never reads it

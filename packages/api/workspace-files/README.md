@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use this package to preview files readable through a Session's filesystem from the web client. It reads UTF-8 text by page, reads bounded byte windows or complete files, resolves related files from a base file's directory, and reports file metadata. Follow changes to a file or a directory's direct entries. Search the workspace for entries by name or relative path. File reads and watches may target paths outside the workspace; directory listing, search, and directory watches remain workspace-scoped. The service exposes no mutation operation.
+Use this package to preview files readable through a Session's filesystem from the web client. It reads UTF-8 text by page, reads bounded byte windows or complete files, resolves related files from a base file's directory, and reports file metadata. Follow changes to a file or a directory's direct entries. Search the workspace for entries by name or relative path. File reads and watches may target paths outside the workspace; directory listing, search, and directory watches remain workspace-scoped. The same package mounts the `gitPanel` namespace for the desktop source-control tab: repository status, one file's unified diff, and index stage/unstage operations. The file-read surface exposes no mutation; only the Git namespace changes the index.
 
 ## Table of Contents
 
@@ -67,6 +67,19 @@ Each call obtains `subprocess` on demand and runs packaged `rg --files --sort=pa
 
 `changes` is a `stream` Remote accepting only a target path. The Host derives the target's type from `stat` and requires workspace containment whenever that type is a directory, including after a type change. A generation registers its observation queue, resolves the target, and starts `fs.watch` before yielding `{ kind: 'ready' }`. It then yields `{ kind: 'change', change }`, where `change` is current stat metadata `{ absolutePath, version }` or `{ absolutePath, absent: true }`. Local providers use Chokidar; directories watch only direct entries. Matching `fs/observed` emissions also invalidate the target. The generation queues changes during setup. Cancellation closes the watcher independently of consumer pulls, and generation or plugin teardown awaits closure. Missing files remain watchable for same-path recreation while their parent directory remains.
 
+### Source control
+
+The package mounts `GitPanel` beside `WorkspaceFiles`; it injects `sessions` and `subprocess`. Its Session-scoped `gitPanel` namespace runs Git in the Session workspace with argument-only commands, a bounded output tail, and a configured deadline:
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `gitPanel/status` | `GitStatusValue { root, branch, entries }` | Repository root, branch (null on a detached HEAD), and each path's index/worktree status letters |
+| `gitPanel/diff` | `GitDiffValue { path, scope, patch, binary, truncated }` | Unified diff for `working` (index vs working tree, untracked files compared with the empty tree) or `staged` (HEAD vs index) |
+| `gitPanel/stage` | `void` | `git add -A -- <paths>` |
+| `gitPanel/unstage` | `void` | `git reset -- <paths>`, or `git rm --cached` before the first commit |
+
+Paths are repository-relative and reach Git only after `--`. A failed launch, non-zero exit, timeout, missing workspace, or non-repository directory is a typed `git-panel/*` failure. The namespace performs index mutations only through these two methods; it never writes working-tree file content.
+
 ### Configuration
 
 | Field | Default | Meaning |
@@ -85,7 +98,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Failures
 
-Each failure is one `RemoteError` code with typed details, declared in [`src/types.ts`](src/types.ts): `workspace-file/not-found`, `workspace-file/outside-workspace` (directory listing or watching), `workspace-file/watch-unsupported` (watch initialization failed), `workspace-file/too-large` (with `limit`, the applicable page, window, or complete-file cap), `workspace-file/not-text`, `workspace-file/not-regular-file` (`kind`: `directory`, `symlink`, or `other`), and `workspace-file/not-directory` (`kind`: `file`, `symlink`, or `other`). Callers branch on the code, never on message text.
+Each failure is one `RemoteError` code with typed details, declared in [`src/types.ts`](src/types.ts): `workspace-file/not-found`, `workspace-file/outside-workspace` (directory listing or watching), `workspace-file/watch-unsupported` (watch initialization failed), `workspace-file/too-large` (with `limit`, the applicable page, window, or complete-file cap), `workspace-file/not-text`, `workspace-file/not-regular-file` (`kind`: `directory`, `symlink`, or `other`), `workspace-file/not-directory` (`kind`: `file`, `symlink`, or `other`), and the Git namespace's `git-panel/not-a-repository`, `git-panel/bad-request`, `git-panel/no-workspace`, `git-panel/timeout`, and `git-panel/command-failed`. Callers branch on the code, never on message text.
 
 ### Client file resources
 

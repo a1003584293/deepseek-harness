@@ -38,6 +38,20 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
      * are resolved by the Host without a Client Session summary.
      */
     'workspace-file/unknown-workspace': { readonly address: string }
+    /** The Session workspace is not a Git checkout, or Git cannot name its root. */
+    'git-panel/not-a-repository': Record<string, never>
+    /** A Git request carried an empty path or path list. */
+    'git-panel/bad-request': Record<string, never>
+    /** The Session has no workspace directory to run Git in. */
+    'git-panel/no-workspace': Record<string, never>
+    /** One Git command exceeded the configured deadline. */
+    'git-panel/timeout': { readonly timeoutMs: number }
+    /** One Git command exited unsuccessfully. */
+    'git-panel/command-failed': {
+      readonly command: string
+      readonly exitCode: number | null
+      readonly stderr: string
+    }
   }
 }
 

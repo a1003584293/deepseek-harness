@@ -30,6 +30,9 @@ import { NavigatorToggle } from './NavigatorToggle.tsx'
 import { QuickOpen, type QuickOpenInjected } from './QuickOpen.tsx'
 import { expandQuickOpenPath, quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
 import { createSearchPreferenceBook, SEARCH_PREFERENCES_KEY } from './search-preferences.ts'
+import {
+  GIT_ID, SourceControlBody, SourceControlTitle, sourceControlDefinition, type GitInjected,
+} from './SourceControlBody.tsx'
 import { createFilesStore } from './store.ts'
 
 export type { SidebarFilesKey } from './locales.ts'
@@ -181,6 +184,7 @@ export function apply(ctx: ClientContext): void {
     }), 'ui-sidebar-files: shortcut')
   })
   ctx.effect(() => ctx.sidebarRightTabs.register(filesDefinition(t)), 'ui-sidebar-files: files type')
+  ctx.effect(() => ctx.sidebarRightTabs.register(sourceControlDefinition(t)), 'ui-sidebar-files: source control type')
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-files: dictionaries')
 
   ctx.effect(() => ctx.slots.registerFactory({
@@ -203,6 +207,25 @@ export function apply(ctx: ClientContext): void {
     { name: 'sidebar.right.pane.tab.title', key: FILES_ID },
     FilesTitle,
   )), 'ui-sidebar-files: files tab title')
+  // Source control is a page in the same dock: the tab body renders the status
+  // groups and the selected patch; Git execution stays behind the Remote.
+  const gitInjected = (sessionId: SessionId): GitInjected => {
+    const git = ctx.remote.gitPanel
+    return {
+      readStatus: signal => git.status(sessionId, signal),
+      readDiff: (path, scope, signal) => git.diff(sessionId, path, scope, signal),
+      stage: (paths, signal) => git.stage(sessionId, [...paths], signal),
+      unstage: (paths, signal) => git.unstage(sessionId, [...paths], signal),
+    }
+  }
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab', key: GIT_ID, locale: NS, inject: gitInjected },
+    SourceControlBody,
+  )), 'ui-sidebar-files: source control tab body')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: GIT_ID },
+    SourceControlTitle,
+  )), 'ui-sidebar-files: source control tab title')
 
   // Quick open: a VS Code-style palette over recent files and the workspace.
   // The sequence value only says "opened again", so one entry resets its query.

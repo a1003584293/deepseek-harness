@@ -26,6 +26,7 @@ import { FileNavigator } from '../src/client/FileNavigator.tsx'
 import { FilesBody } from '../src/client/FilesBody.tsx'
 import { FilesTitle } from '../src/client/FilesTitle.tsx'
 import { NavigatorToggle } from '../src/client/NavigatorToggle.tsx'
+import { GIT_ID, SourceControlBody, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
 import { en, ja, zh, es, fr, de, ru, pt } from '../src/client/locales.ts'
 import type { createFilesStore } from '../src/client/store.ts'
 
@@ -289,13 +290,17 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.files.navigator.toggle', undefined, 'sidebarFiles'],
       ['sidebar.right.pane.tab', FILES_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', FILES_ID, undefined],
+      ['sidebar.right.pane.tab', GIT_ID, 'sidebarFiles'],
+      ['sidebar.right.pane.tab.title', GIT_ID, undefined],
       ['shell.overlay', undefined, 'sidebarFiles'],
     ])
     expect(slots.registerFactory.mock.calls.map(([options]) => [options.name, options.scope]))
       .toEqual([['sidebar.files.tree', 'root'], ['sidebar.files.navigator', 'session'], ['sidebar.files.navigator.toggle', 'session']])
-    const [tree, factory, toggle, body, title, palette] = registered
-    expect([factory?.component, toggle?.component, body?.component, title?.component, palette?.component])
-      .toEqual([FileNavigator, NavigatorToggle, FilesBody, FilesTitle, QuickOpen])
+    const [tree, factory, toggle, body, title, gitBody, gitTitle, palette] = registered
+    expect([
+      factory?.component, toggle?.component, body?.component, title?.component,
+      gitBody?.component, gitTitle?.component, palette?.component,
+    ]).toEqual([FileNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlBody, SourceControlTitle, QuickOpen])
     expect(tree?.component).toBe(FileTree)
     expect(slots.registerFactory.mock.calls[0]?.[0]).toMatchObject({ slots: { accessory: { scope: 'root' } } })
     // One store handle for the Factory, the toggle and the page.

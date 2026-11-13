@@ -1,6 +1,6 @@
 /** Window-chrome controls for the fully hidden sidebar (frame shell.leading seat). */
 import {
-  IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, Tooltip,
+  IconBranchOutlineRegular, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the frame's shell.leading slot declaration.
@@ -22,7 +22,7 @@ export type HeaderLeadingControlsProps =
  * @returns the sidebar toggle, plus New Session on Desktop while access allows `session/create`.
  */
 export function HeaderLeadingControls({
-  toggleSidebar, startSession, trackEntryClick, useRemoteAccess, useShortcuts, t,
+  toggleSidebar, startSession, openSourceControl, trackEntryClick, useRemoteAccess, useShortcuts, t,
 }: HeaderLeadingControlsProps) {
   // A page whose access snapshot excludes starting a Session keeps only the sidebar toggle here.
   const canStartSession = useRemoteAccess('session/create')
@@ -56,6 +56,19 @@ export function HeaderLeadingControls({
             }}
           >
             <IconNewChatOutlineRegular size={16} />
+          </button>
+        </Tooltip>
+      )}
+      {desktop && (
+        <Tooltip label={t('sourceControl.open')} delayMs={500}>
+          <button
+            data-source-control-opener
+            type="button"
+            className={css.iconButton}
+            aria-label={t('sourceControl.open')}
+            onClick={() => { openSourceControl() }}
+          >
+            <IconBranchOutlineRegular size={16} />
           </button>
         </Tooltip>
       )}

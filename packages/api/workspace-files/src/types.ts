@@ -227,5 +227,66 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       readonly path: string
       readonly kind: 'file' | 'symlink' | 'other'
     }
+    /** The Session workspace is not a Git checkout, or Git cannot name its root. */
+    'git-panel/not-a-repository': Record<string, never>
+    /** A Git request carried an empty path or path list. */
+    'git-panel/bad-request': Record<string, never>
+    /** The Session has no workspace directory to run Git in. */
+    'git-panel/no-workspace': Record<string, never>
+    /** One Git command exceeded the configured deadline. */
+    'git-panel/timeout': { readonly timeoutMs: number }
+    /** One Git command exited unsuccessfully. */
+    'git-panel/command-failed': {
+      readonly command: string
+      readonly exitCode: number | null
+      readonly stderr: string
+    }
   }
+}
+
+/** Where one file's diff is read from. */
+export type GitDiffScope = 'working' | 'staged'
+
+/** One changed path and the index/worktree status letters Git reports. */
+export interface GitStatusEntry {
+  /** Path relative to the repository root, using `/`. */
+  path: string
+  /** Index (staged) status letter; `' '` means unchanged. */
+  index: string
+  /** Worktree (unstaged) status letter; `' '` means unchanged. */
+  worktree: string
+}
+
+/** Repository facts and every changed path of one Session workspace. */
+export interface GitStatusValue {
+  /** Absolute repository root in the Session execution world. */
+  root: string
+  /** Checked-out branch, or null on a detached HEAD. */
+  branch: string | null
+  /** Changed paths in Git's reported order. */
+  entries: GitStatusEntry[]
+}
+
+/** One file's unified diff. */
+export interface GitDiffValue {
+  /** The path the diff describes. */
+  path: string
+  /** The scope the diff was read for. */
+  scope: GitDiffScope
+  /** Unified diff text; empty when the file has no change in that scope. */
+  patch: string
+  /** Whether Git reported binary content instead of hunks. */
+  binary: boolean
+  /** Whether the configured output cap cut the patch. */
+  truncated: boolean
+}
+
+/** Deployment limits for one Git command. */
+export interface GitPanelConfig {
+  /** Git executable name or absolute path. */
+  gitCommand: string
+  /** Deadline for one Git command. */
+  timeoutMs: number
+  /** Byte cap on one command's stdout. */
+  maxOutputBytes: number
 }

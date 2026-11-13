@@ -47,7 +47,7 @@ function makeHeaderProps(): HeaderLeadingControlsProps {
     usePanels: selector => selector([]), useShortcuts: selector => selector([]),
     useEntryPins: selector => selector([]), useEntryActions: selector => selector(false),
     selectPanel: vi.fn(), setPinned: vi.fn(), toggleSidebar: vi.fn(),
-    startSession: vi.fn(), trackEntryClick: vi.fn(), t,
+    startSession: vi.fn(), openSourceControl: vi.fn(), trackEntryClick: vi.fn(), t,
   }
 }
 
@@ -81,7 +81,7 @@ function mountShell({ collapsed = false, width = 300, drawer = false, shortcuts 
       useShortcuts={selector => selector(shortcuts)}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={startSession} toggleSidebar={toggleSidebar} trackEntryClick={trackEntryClick} t={t}
+      startSession={startSession} toggleSidebar={toggleSidebar} openSourceControl={vi.fn()} trackEntryClick={trackEntryClick} t={t}
       renderFactorySlot={() => null}
       renderSlot={((
         key: string,
@@ -186,7 +186,8 @@ describe('SidebarRoot shell', () => {
     expect(Array.from(expanded.querySelectorAll('kbd'), key => key.textContent)).toEqual(['Ctrl', 'N'])
     cleanup()
     document.documentElement.dataset.platform = 'darwin'
-    render(<HeaderLeadingControls toggleSidebar={vi.fn()} startSession={vi.fn()} selectPanel={vi.fn()} trackEntryClick={vi.fn()} t={t}
+    render(<HeaderLeadingControls toggleSidebar={vi.fn()} startSession={vi.fn()} openSourceControl={vi.fn()}
+      selectPanel={vi.fn()} trackEntryClick={vi.fn()} t={t}
       usePanelInfo={neverHook} useSessions={neverHook} useSessionStatus={neverHook}
       useSessionRetainInfo={neverHook} useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
@@ -239,7 +240,7 @@ describe('SidebarRoot shell', () => {
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
       useRemoteAccess={useRemoteAccess}
-      startSession={startSession} toggleSidebar={toggleSidebar} trackEntryClick={vi.fn()} t={t}
+      startSession={startSession} toggleSidebar={toggleSidebar} openSourceControl={vi.fn()} trackEntryClick={vi.fn()} t={t}
       renderFactorySlot={() => null}
       renderSlot={((key: string) => {
         if (key === 'sidebar.brand.mark') return <span data-testid="brand-mark">M</span>
@@ -271,7 +272,7 @@ describe('SidebarRoot shell', () => {
       useShortcuts={selector => selector([])}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} trackEntryClick={vi.fn()} t={t}
+      startSession={vi.fn()} toggleSidebar={vi.fn()} openSourceControl={vi.fn()} trackEntryClick={vi.fn()} t={t}
       renderFactorySlot={() => null}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
@@ -296,7 +297,7 @@ describe('SidebarRoot shell', () => {
       useShortcuts={selector => selector([])}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} trackEntryClick={vi.fn()} t={t}
+      startSession={vi.fn()} toggleSidebar={vi.fn()} openSourceControl={vi.fn()} trackEntryClick={vi.fn()} t={t}
       renderFactorySlot={() => null}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
@@ -325,7 +326,7 @@ describe('SidebarRoot shell', () => {
       useShortcuts={selector => selector([])}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={startSession} toggleSidebar={vi.fn()} trackEntryClick={trackEntryClick} t={t}
+      startSession={startSession} toggleSidebar={vi.fn()} openSourceControl={vi.fn()} trackEntryClick={trackEntryClick} t={t}
       renderFactorySlot={() => null}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
@@ -377,7 +378,7 @@ describe('SidebarRoot shell', () => {
       useShortcuts={selector => selector([])}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} trackEntryClick={vi.fn()} t={t}
+      startSession={vi.fn()} toggleSidebar={vi.fn()} openSourceControl={vi.fn()} trackEntryClick={vi.fn()} t={t}
       renderFactorySlot={() => null}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
@@ -449,7 +450,7 @@ describe('SidebarRoot shell', () => {
       useShortcuts={selector => selector([])}
       useContextMenu={contextMenuHook()} useResource={useResource} useWorkspaces={neverHook}
       {...allowAllAccess}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} trackEntryClick={vi.fn()} t={t}
+      startSession={vi.fn()} toggleSidebar={vi.fn()} openSourceControl={vi.fn()} trackEntryClick={vi.fn()} t={t}
       renderFactorySlot={() => null}
       renderSlot={((key: string) => key === 'sidebar.toggle.badge'
         ? <Tooltip label="Update — V1.2.3"><span data-testid="badge" /></Tooltip>

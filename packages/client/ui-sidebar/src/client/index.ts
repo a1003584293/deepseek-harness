@@ -80,6 +80,16 @@ export function apply(ctx: ClientContext): void {
     // (current Session Workspace, then recent Workspace).
     startSession: (workspaceId) => { workspaceNavigation.startSession(workspaceId) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
+    openSourceControl: () => {
+      // The page belongs to the right sidebar's tab registry; a composition
+      // without that surface keeps the button inert instead of failing.
+      const sidebar = ctx.get('sidebarRight') as {
+        commandTarget(element: Element | null): { readonly sessionId: string } | undefined
+        openTab(kind: string, options?: { readonly revealIfOpened?: boolean }): void
+      } | undefined
+      if (sidebar === undefined || sidebar.commandTarget(null) === undefined) return
+      sidebar.openTab('source-control', { revealIfOpened: false })
+    },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
     setPinned: panelPins.setPinned,
     trackEntryClick: (attributes) => { ctx.get('productAnalytics')?.track('sidebar_menu_click', attributes) },
