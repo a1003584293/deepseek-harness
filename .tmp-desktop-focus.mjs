@@ -1,0 +1,16 @@
+import { chromium } from './apps/web/node_modules/playwright/index.mjs'
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9333')
+const page = browser.contexts()[0].pages()[0]
+await page.bringToFront()
+await page.locator('body').click({ position: { x: 600, y: 700 }, force: true }).catch(() => {})
+await page.waitForTimeout(500)
+console.log('focus', await page.evaluate(() => document.hasFocus()))
+await page.keyboard.press('Meta+T')
+await page.waitForTimeout(1500)
+const text = (await page.locator('body').innerText()).slice(-900)
+await page.keyboard.press('Meta+J')
+await page.waitForTimeout(3000)
+const bottom = await page.locator('[data-bottom-terminal]').count()
+await page.screenshot({ path: '/tmp/desktop-focus.png' })
+console.log(JSON.stringify({ text, bottom }, null, 2))
+await browser.close()

@@ -53,6 +53,7 @@ export const zh = {
   'editor.saveFailed': '保存失败：{message}',
   'editor.conflict': '文件已在磁盘上更改，请重新加载后再保存。',
   'editor.noMonaco': 'Monaco 编辑器不可用。',
+  'editor.noFile': '没有要编辑的文件。',
 
   loading: '正在读取…',
   empty: '空目录',
@@ -148,6 +149,7 @@ export const en = {
   'editor.saveFailed': 'Save failed: {message}',
   'editor.conflict': 'The file changed on disk. Reload before saving.',
   'editor.noMonaco': 'Monaco editor is unavailable.',
+  'editor.noFile': 'No file to edit.',
 
   loading: 'Reading…',
   empty: 'Empty directory',
@@ -240,6 +242,7 @@ export const ja = {
   'editor.saveFailed': '保存に失敗しました：{message}',
   'editor.conflict': 'ファイルはディスク上で変更されています。再読み込みしてから保存してください。',
   'editor.noMonaco': 'Monaco エディターを利用できません。',
+  'editor.noFile': '編集するファイルがありません。',
 
   'loading': '読み取り中…',
   'empty': '空のディレクトリ',
@@ -332,6 +335,7 @@ export const es = {
   'editor.saveFailed': 'Error al guardar: {message}',
   'editor.conflict': 'El archivo cambió en el disco. Recarga antes de guardar.',
   'editor.noMonaco': 'El editor Monaco no está disponible.',
+  'editor.noFile': 'No hay ningún archivo para editar.',
 
   loading: 'Leyendo…',
   empty: 'Directorio vacío',
@@ -424,6 +428,7 @@ export const fr = {
   'editor.saveFailed': 'Échec de l’enregistrement : {message}',
   'editor.conflict': 'Le fichier a changé sur le disque. Rechargez avant d’enregistrer.',
   'editor.noMonaco': 'L’éditeur Monaco est indisponible.',
+  'editor.noFile': 'Aucun fichier à modifier.',
 
   loading: 'Lecture…',
   empty: 'Répertoire vide',
@@ -516,6 +521,7 @@ export const de = {
   'editor.saveFailed': 'Speichern fehlgeschlagen: {message}',
   'editor.conflict': 'Die Datei wurde auf dem Datenträger geändert. Vor dem Speichern neu laden.',
   'editor.noMonaco': 'Monaco-Editor ist nicht verfügbar.',
+  'editor.noFile': 'Keine Datei zum Bearbeiten.',
 
   loading: 'Lesen…',
   empty: 'Leeres Verzeichnis',
@@ -608,6 +614,7 @@ export const ru = {
   'editor.saveFailed': 'Ошибка сохранения: {message}',
   'editor.conflict': 'Файл изменился на диске. Перезагрузите перед сохранением.',
   'editor.noMonaco': 'Редактор Monaco недоступен.',
+  'editor.noFile': 'Нет файла для редактирования.',
 
   loading: 'Чтение…',
   empty: 'Пустой каталог',
@@ -700,6 +707,7 @@ export const pt = {
   'editor.saveFailed': 'Falha ao salvar: {message}',
   'editor.conflict': 'O arquivo mudou no disco. Recarregue antes de salvar.',
   'editor.noMonaco': 'O editor Monaco não está disponível.',
+  'editor.noFile': 'Nenhum arquivo para editar.',
 
   loading: 'Lendo…',
   empty: 'Diretório vazio',

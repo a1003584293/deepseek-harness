@@ -84,6 +84,9 @@ export function apply(ctx: ClientContext): void {
   const handle = createFilesStore()
   // One book for the plugin, not per Session: Sessions rooted at the same workspace share its preferences.
   const preferences = createSearchPreferenceBook(createSnapshotStore<unknown>({}, { persist: { name: SEARCH_PREFERENCES_KEY } }))
+  // Restored page tabs lose navigation params but keep their content identity;
+  // remember the address per content so the editor can reload its file.
+  const editorPaths = createSnapshotStore<Record<string, string>>({}, { persist: { name: 'sidebarEditorPaths' } })
   const workspaceSearch = createSearch(ctx.remote)
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {
     const source = ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: tabId }).navigation
@@ -242,6 +245,11 @@ export function apply(ctx: ClientContext): void {
     readDocument: (path, signal) => ctx.remote.workspaceFiles.readDocument(sessionId, path, signal),
     writeDocument: (path, text, expectedVersion, signal) =>
       ctx.remote.workspaceFiles.writeDocument(sessionId, path, text, expectedVersion, signal),
+    pathFor: contentId => editorPaths.getSnapshot()[contentId],
+    rememberPath: (contentId, path) => {
+      const current = editorPaths.getSnapshot()
+      if (current[contentId] !== path) editorPaths.set({ ...current, [contentId]: path })
+    },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')

@@ -54,6 +54,10 @@ export interface EditorInjected {
     expectedVersion: string | undefined,
     signal: AbortSignal,
   ) => Promise<RemoteResult<WorkspaceFileWrite>>
+  /** The last address this editor content opened, for a restored page whose navigation params are gone. */
+  readonly pathFor: (contentId: string) => string | undefined
+  /** Remember the address this editor content opened. */
+  readonly rememberPath: (contentId: string, path: string) => void
 }
 
 /** Standard tab seat, namespace copy, and the complete-file operations. */
@@ -109,9 +113,9 @@ function darkTheme(): boolean {
  * @param props - the tab occurrence, namespace copy, and complete-file operations.
  * @returns the editor header above the Monaco surface.
  */
-export function EditorBody({ useTabInfo, readDocument, writeDocument, t }: EditorBodyProps): ReactNode {
+export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, rememberPath, t }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
-  const address = tab.navigation.params?.path ?? ''
+  const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
   const path = parseFileAddress(address)?.path ?? address
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
@@ -130,9 +134,18 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, t }: Edito
   writeRef.current = writeDocument
   const tRef = useRef(t)
   tRef.current = t
+  const rememberRef = useRef(rememberPath)
+  rememberRef.current = rememberPath
   const saveRef = useRef<() => void>(() => {})
 
   useEffect(() => {
+    if (address === '') {
+      setDocument(undefined)
+      setError(undefined)
+      setDirty(false)
+      return
+    }
+    rememberRef.current(tab.contentId, address)
     const controller = new AbortController()
     setDocument(undefined)
     setError(undefined)
@@ -154,7 +167,7 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, t }: Edito
       }
     })()
     return () => { controller.abort() }
-  }, [path, reloadKey])
+  }, [address, path, reloadKey, tab.contentId])
 
   const save = useCallback(async (): Promise<void> => {
     if (document === undefined || savingRef.current) return
@@ -224,6 +237,13 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, t }: Edito
     }
   }, [document, path])
 
+  if (path === '') {
+    return (
+      <div className={css.page} data-file-editor>
+        <p className={css.note}>{t('editor.noFile')}</p>
+      </div>
+    )
+  }
   if (document === undefined) {
     return (
       <div className={css.page} data-file-editor>
