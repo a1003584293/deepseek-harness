@@ -29,7 +29,7 @@ Mount this package as a Loader entry in a profile that serves browser configurat
 
 `settings.describe()` returns deployment facts and every namespace under `redactSecrets: true`. `settings.update`, `settings.replace`, and `settings.mutate` expose the settings service's three write operations and return the namespace's new redacted view; stale writes use `settings-conflict` and other provider refusals use `settings-rejected`.
 
-`settings.openSettingsDocument()` prepares the provider-owned document and opens it with the native text editor; it accepts no browser-supplied filesystem target.
+`settings.prepareSettingsDocument()` materializes the provider-owned document and returns its absolute path for the built-in editor; `settings.openSettingsDocument()` prepares it and hands it to a native text editor. Neither accepts a browser-supplied filesystem target.
 
 -----
 

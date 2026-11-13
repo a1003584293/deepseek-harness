@@ -19,7 +19,7 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { z } from 'zod'
 import { CredentialsController } from './credentials.ts'
-import type { SettingsDocumentOpenValue } from './types.ts'
+import type { SettingsDocumentOpenValue, SettingsDocumentPrepareValue } from './types.ts'
 
 export { CredentialsController } from './credentials.ts'
 export type * from './types.ts'
@@ -163,6 +163,29 @@ export class SettingsController extends TypertRemoteService {
    * @returns confirmation after the native opener accepts the document.
    * @throws RemoteError when no document exists, preparation fails, or opening fails.
    */
+  /**
+   * Materialize the provider-owned settings document and return its absolute path.
+   *
+   * The browser opens the path in its own editor; unlike
+   * `openSettingsDocument` this never launches a native application.
+   * @param signal - caller lifetime; abort terminates preparation.
+   * @returns the absolute document path.
+   * @throws RemoteError when no document exists or preparation fails.
+   */
+  @Remote
+  async prepareSettingsDocument(signal: AbortSignal): Promise<SettingsDocumentPrepareValue> {
+    const settings = this.provider()
+    if (isAborted(signal)) throw new RemoteError('gateway/cancelled', 'settings document preparation was aborted', {})
+    try {
+      const path = await settings.prepareDocument()
+      if (isAborted(signal)) throw new RemoteError('gateway/cancelled', 'settings document preparation was aborted', {})
+      return { path }
+    } catch (error: unknown) {
+      if (error instanceof RemoteError) throw error
+      throw new RemoteError('gateway/internal', `settings document preparation failed: ${messageOf(error)}`, {}, { cause: error })
+    }
+  }
+
   @Remote
   async openSettingsDocument(signal: AbortSignal): Promise<SettingsDocumentOpenValue> {
     const settings = this.provider()

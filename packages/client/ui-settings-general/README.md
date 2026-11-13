@@ -53,7 +53,7 @@ The General section holds the built-in Coding Tools and Current version rows alo
 
 ### Opening the configuration file
 
-On a loopback browser, the shell renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action opens that document in the native text editor (bypassing the browser file association on macOS). Remote browsers never register this native-open action, including on configured public deployments; their preferences persist through the Host settings service.
+On a loopback browser, the shell renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action asks the Host for the document's absolute path and opens that path in the built-in Monaco editor tab; no native text editor is launched. Remote browsers never register this action, including on configured public deployments; their preferences persist through the Host settings service.
 
 ### Onboarding steps
 
@@ -89,7 +89,7 @@ The `shell.overlay` entry `host-release-change` binds `ctx.modules.entries.relea
 
 ### Document availability
 
-On a loopback page, the Client loads the provider's `hasDocument` capability through `settings/describe` and renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action calls the pathless, browser-authenticated `settings/openSettingsDocument` Remote; the Host resolves the provider path again, materializes an absent document, and hands it to a native text editor (`open -t` on macOS, bypassing a browser file association; the desktop file association on Linux and Windows; Windows association after `wslpath -w` translation on WSL). Open failures keep the action available and render a localized error. Reopening the dialog or reconnecting refreshes availability after a transient read failure or Host topology change. Non-loopback pages withhold this native action through the Client policy.
+On a loopback page, the Client loads the provider's `hasDocument` capability through `settings/describe` and renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action calls `settings/prepareSettingsDocument`; the Host resolves the provider path, materializes an absent document, and returns its absolute path. The Client opens that path as a `file-editor` tab, so the same Monaco instance, save guard, and version conflict handling apply. Open failures keep the action available and render a localized error. Reopening the dialog or reconnecting refreshes availability after a transient read failure or Host topology change. Non-loopback pages withhold this action through the Client policy.
 
 ### Host half
 

@@ -326,13 +326,11 @@ export class WorkspaceFiles extends TypertRemoteService {
     const expected = expectedVersion === undefined
       ? undefined
       : { kind: 'replaceIfVersion' as const, version: expectedVersion as FsVersion }
-    // The editor writes inside the Session workspace under the same fence the
-    // Agent's workspace-write policy uses; the read path stays unfenced.
-    const policy = {
-      mode: 'workspace-write' as const,
-      workspaceRoot: workspaceFileScope.workspaceRoot,
-      sessionId: workspaceFileScope.sessionId,
-    }
+    // Use the Session's own policy, not a hard-coded workspace-write fence: a
+    // full-access Session may also save a provider document outside its
+    // workspace, while a workspace-write Session still refuses that path.
+    const live = this.ctx.get('sessions')?.get(workspaceFileScope.sessionId)
+    const policy = this.ctx.sandboxPolicy.resolve(live === undefined ? {} : { session: live })
     const outcome = await this.ctx.fs.writeText(target, text, expected, signal, policy).catch((cause: unknown) => {
       if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'FS_STALE_VERSION') {
         throw new RemoteError('workspace-file/stale-version', `"${path}" changed after it was loaded`, { path }, { cause })

@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createShortcutsStore } from './store.ts'
-import { ShortcutReference, ShortcutsRow } from './Reference.tsx'
+import { ShortcutReference, ShortcutsSection } from './Reference.tsx'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { fixedCommands } from './fixed.ts'
 
@@ -39,10 +39,10 @@ export function apply(ctx: Context): void {
   }
   const injected = () => ({ platform: ctx.shortcuts.platform, runtime: ctx.shortcuts.runtime, edit, recording, describeBinding,
     hooks: { catalog: ctx.shortcuts.catalog, config: ctx.shortcuts.config, fixedCatalog: ctx.shortcuts.fixedCatalog } })
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item', id: 'shortcuts', order: 16, locale: 'shortcuts', store,
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section', id: 'shortcuts', order: 1, label: () => t('title'), locale: 'shortcuts', store,
     inject: injected,
-  }, ShortcutsRow))
+  }, ShortcutsSection))
   ctx.slots.inject('shell.overlay', () => {
     const disposeCommand = ctx.shortcuts.register({
       id: 'shortcuts.open' as ShortcutCommandId, label: () => t('open'), aliases: ['shortcuts', 'keyboard shortcuts'],

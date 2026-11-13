@@ -23,6 +23,25 @@ export interface ReferenceInjected {
 type Store = PropsStore<ReturnType<typeof createShortcutsStore>>
 type Locale = PropsLocale<'shortcuts'>
 
+/**
+ * Render the top-level Shortcuts settings section.
+ * @param props - the shared reference store, catalog hook, and localized copy.
+ * @returns the section body with its open-the-reference action.
+ */
+export function ShortcutsSection({ actions, t, useCatalog }: PropsRuntime<'settings.section'> & Store & Locale & InjectFace<ReferenceInjected>) {
+  const shortcut = useCatalog(rows => rows.find(row => row.id === 'shortcuts.open'))
+  return <div className={css.setting}>
+    <div className={css.settingText}>
+      <div className={css.settingTitle}>{t('settings')}</div>
+      <p className={css.settingDescription}>{t('description')}</p>
+    </div>
+    <Tooltip disabled={!shortcut?.keys.length} label={t('global-hint')} shortcutKeys={shortcut?.keys}>
+      <button className={css.button} type="button" aria-label={t('view')} aria-keyshortcuts={shortcut?.aria}
+        onClick={() => { actions.open() }}>{t('view')}</button>
+    </Tooltip>
+  </div>
+}
+
 /** Core reference positions are independent of labels and plugin registration order. */
 const coreActionOrder = new Map<string, number>([
   'shortcuts.open',
@@ -52,6 +71,7 @@ const coreActionOrder = new Map<string, number>([
  * @param props - shared dialog action and localized labels.
  * @returns the settings row.
  */
+// oxlint-disable-next-line sonarjs/no-identical-functions -- retired General row kept for the reference fixture
 export function ShortcutsRow({ actions, t, useCatalog }: PropsRuntime<'settings.general.item'> & Store & Locale & InjectFace<ReferenceInjected>) {
   const shortcut = useCatalog(rows => rows.find(row => row.id === 'shortcuts.open'))
   return <div className={css.setting}>

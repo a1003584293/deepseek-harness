@@ -26,7 +26,7 @@ export type SettingsDocumentActionProps =
  * @param props - header owner props, localized copy, and injected document state.
  * @returns the action, or null while unavailable or unresolved.
  */
-export function SettingsDocumentAction({ controller, useSnapshot, t }: SettingsDocumentActionProps): ReactNode {
+export function SettingsDocumentAction({ controller, useSnapshot, close, t }: SettingsDocumentActionProps): ReactNode {
   const state = useSnapshot(snapshot => snapshot)
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function SettingsDocumentAction({ controller, useSnapshot, t }: SettingsD
         variant="outline"
         size="sm"
         disabled={state.opening}
-        onClick={() => { void controller.open() }}
+        onClick={() => { void controller.open().then((opened) => { if (opened) close?.() }) }}
       >
         {t('openDocument')}
       </Button>

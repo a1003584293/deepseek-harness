@@ -33,6 +33,7 @@ export class SettingsDocumentStore {
   constructor(
     private readonly ctx: ClientContext,
     private readonly describeFace: SettingsDescribeFace,
+    private readonly openEditor: (path: string) => void,
   ) {}
 
   /**
@@ -54,19 +55,22 @@ export class SettingsDocumentStore {
    * Open the loaded document once; concurrent gestures collapse behind the in-flight action.
    * @returns after the native-open request settles, or immediately when unavailable/already opening.
    */
-  async open(): Promise<void> {
+  async open(): Promise<boolean> {
     const current = this.store.getSnapshot()
-    if (current.status !== 'ready' || current.opening) return
+    if (current.status !== 'ready' || current.opening) return false
     this.store.update((state) => {
       state.opening = true
       state.error = null
     })
     try {
-      const result = await this.ctx.remote.settings.openSettingsDocument()
+      const result = await this.ctx.remote.settings.prepareSettingsDocument()
       if (!result.ok) {
         const { message } = result.error
         this.store.update((state) => { state.error = message })
+        return false
       }
+      this.openEditor(result.value.path)
+      return true
     } finally {
       this.store.update((state) => { state.opening = false })
     }

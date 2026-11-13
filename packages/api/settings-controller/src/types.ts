@@ -32,3 +32,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export interface SettingsDocumentOpenValue {
   readonly opened: true
 }
+
+/** Absolute path of the provider-owned settings document, materialized on request. */
+export interface SettingsDocumentPrepareValue {
+  readonly path: string
+}

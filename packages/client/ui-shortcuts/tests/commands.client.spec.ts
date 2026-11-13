@@ -29,9 +29,9 @@ describe('assembled shortcut command owners', () => {
     await injected.recording(false)
     const shortcut = shortcuts.catalog.getSnapshot().find(row => row.id === 'shortcuts.open')!
     expect((await injected.edit({ type: 'reset', id: shortcut.id }, shortcuts.config.getSnapshot().revision)).status).toBe('saved')
-    const row = client.ctx.slots.entries('settings.general.item').find(entry => entry.options.id === 'shortcuts')!
-    const rowInjected: Partial<ReferenceInjected> | undefined = row.inject?.()
-    expect(rowInjected?.hooks?.catalog).toBe(shortcuts.catalog)
+    const section = client.ctx.slots.entries('settings.section').find(entry => entry.options.id === 'shortcuts')!
+    const sectionInjected: Partial<ReferenceInjected> | undefined = section.inject?.()
+    expect(sectionInjected?.hooks?.catalog).toBe(shortcuts.catalog)
     const ownerIds = ['settings.open', 'shortcuts.open', 'sidebar.left.toggle']
     const ownedRows = () => shortcuts.catalog.getSnapshot().filter(row => ownerIds.includes(row.id))
     expect(ownedRows().map(row => row.id).sort()).toEqual(ownerIds)

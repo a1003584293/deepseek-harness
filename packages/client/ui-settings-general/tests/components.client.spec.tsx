@@ -22,9 +22,9 @@ const useResource = (() => ({ status: 'none' as const, value: undefined, failure
 const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
 
 /** Store over a real mirror derived from the same scripted context. */
-function derivedDocumentStore(remote: object) {
+function derivedDocumentStore(remote: object, openEditor = vi.fn()) {
   const ctx = { remote } as never
-  return new SettingsDocumentStore(ctx, new SettingsDescribeMirror(ctx))
+  return new SettingsDocumentStore(ctx, new SettingsDescribeMirror(ctx), openEditor)
 }
 import { en, zh } from '../src/client/locales.ts'
 import { CurrentVersionRow } from '../src/client/CurrentVersionRow.tsx'
@@ -145,35 +145,40 @@ describe('GeneralSection', () => {
 describe('SettingsDocumentAction', () => {
   it('appears only for a file-backed provider and requests its Host-owned document', async () => {
     const openDocument = vi.fn(() => Promise.resolve({
-      ok: true as const, value: { opened: true as const },
+      ok: true as const, value: { path: '/repo/.dsh/cordis.patch.yml' },
     }))
+    const openEditor = vi.fn()
+    const close = vi.fn()
     const controller = derivedDocumentStore({
       settings: {
         describe: vi.fn(() => Promise.resolve({
           ok: true as const,
           value: { writable: true, hasDocument: true, namespaces: [] },
         })),
-        openSettingsDocument: openDocument,
+        prepareSettingsDocument: openDocument,
       },
-    })
+    }, openEditor)
     render(<SettingsDocumentAction
       {...kit}
       t={t}
+      close={close}
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
     />)
     const action = await screen.findByRole('button', { name: 'Open configuration file' })
     fireEvent.click(action)
     await waitFor(() => { expect(openDocument).toHaveBeenCalledWith() })
+    expect(openEditor).toHaveBeenCalledWith('/repo/.dsh/cordis.patch.yml')
+    expect(close).toHaveBeenCalled()
   })
 
   it('stays absent without a document and follows a mirror refresh to available', async () => {
     const describe = vi.fn()
       .mockResolvedValueOnce({ ok: true as const, value: { writable: true, hasDocument: false, namespaces: [] } })
       .mockResolvedValueOnce({ ok: true as const, value: { writable: true, hasDocument: true, namespaces: [] } })
-    const ctx = { remote: { settings: { describe, openSettingsDocument: vi.fn() } } } as never
+    const ctx = { remote: { settings: { describe, prepareSettingsDocument: vi.fn() } } } as never
     const mirror = new SettingsDescribeMirror(ctx)
-    const controller = new SettingsDocumentStore(ctx, mirror)
+    const controller = new SettingsDocumentStore(ctx, mirror, vi.fn())
     const first = render(<SettingsDocumentAction
       {...kit}
       t={t}
@@ -205,9 +210,9 @@ describe('SettingsDocumentAction', () => {
           ok: true as const,
           value: { writable: true, hasDocument: true, namespaces: [] },
         })),
-        openSettingsDocument: vi.fn(() => Promise.resolve({
+        prepareSettingsDocument: vi.fn(() => Promise.resolve({
           ok: false as const,
-          error: new RemoteError('gateway/internal', 'xdg-open missing', {}),
+          error: new RemoteError('gateway/internal', 'settings document missing', {}),
         })),
       },
     })

@@ -120,8 +120,8 @@ export interface SettingsTriggerOwnerProps {
 
 /** Owner share of the header title seat (the shell supplies nothing). */
 export interface SettingsHeaderOwnerProps {
-  /** Marker field: header owner props are intentionally empty. */
-  children?: never
+  /** Close the settings panel; a header action that hands off to another surface uses it. */
+  readonly close?: () => void
 }
 
 /**

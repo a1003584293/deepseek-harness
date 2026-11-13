@@ -141,8 +141,14 @@ export function apply(ctx: ClientContext): void {
   // locale/change re-registration wiring.
   const t = ctx.locale.bind(NS)
   // The shared ConfigForm mirror updates after document commits and reconnects.
+  const openSettingsDocument = (path: string): void => {
+    const sidebar = ctx.get('sidebarRight') as {
+      openTab(kind: string, options: { params: { path: string } }): void
+    } | undefined
+    sidebar?.openTab('file-editor', { params: { path } })
+  }
   const documentController = ctx.remote.$host.isLoopback
-    ? new SettingsDocumentStore(ctx, ctx.configForms.describe())
+    ? new SettingsDocumentStore(ctx, ctx.configForms.describe(), openSettingsDocument)
     : undefined
   const documentInjected = documentController === undefined
     ? undefined

@@ -54,7 +54,7 @@ Pass the required options object as `{}` for a complete file under `maxFileBytes
 
 ### Editable documents
 
-`readDocument(path)` returns the complete UTF-8 text and the same version/byte identity as `stat`, refusing a document over `maxFileBytes` or one the backend rejects as non-text. `writeDocument(path, text, expectedVersion)` replaces that document, passes the Session workspace root as the `workspace-write` fence, and returns the new version. Supplying the loaded version guards against an external edit: a mismatch is `workspace-file/stale-version`, never a silent overwrite. The editor opens the file's absolute or workspace-relative path; writes outside the Session workspace are refused by the fence.
+`readDocument(path)` returns the complete UTF-8 text and the same version/byte identity as `stat`, refusing a document over `maxFileBytes` or one the backend rejects as non-text. `writeDocument(path, text, expectedVersion)` replaces that document, runs under the Session's resolved sandbox policy, and returns the new version. A full-access Session may save the provider settings document outside its workspace; a workspace-write Session still refuses that path. Supplying the loaded version guards against an external edit: a mismatch is `workspace-file/stale-version`, never a silent overwrite. The editor opens the file's absolute or workspace-relative path; writes outside the Session workspace are refused by the fence.
 
 ### File-read and directory checks
 

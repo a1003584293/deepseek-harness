@@ -54,7 +54,7 @@ kind: "package-reference"
 
 ### 可编辑文档
 
-`readDocument(path)` 返回完整 UTF-8 文本，以及和 `stat` 相同的版本与字节身份；超过 `maxFileBytes` 或后端判定非文本时拒绝。`writeDocument(path, text, expectedVersion)` 替换该文档，以 Session 工作区根作为 `workspace-write` 围栏，并返回新版本。带上加载时的版本可防止外部修改被静默覆盖；版本不匹配返回 `workspace-file/stale-version`。编辑器接受绝对路径或工作区相对路径；工作区外的写入会被围栏拒绝。
+`readDocument(path)` 返回完整 UTF-8 文本，以及和 `stat` 相同的版本与字节身份；超过 `maxFileBytes` 或后端判定非文本时拒绝。`writeDocument(path, text, expectedVersion)` 替换该文档，在 Session 解析后的沙箱策略下执行，并返回新版本。完全权限的 Session 可以保存工作区外的提供方配置文件；workspace-write 的 Session 仍会拒绝该路径。带上加载时的版本可防止外部修改被静默覆盖；版本不匹配返回 `workspace-file/stale-version`。编辑器接受绝对路径或工作区相对路径；工作区外的写入会被围栏拒绝。
 
 ### 文件读取与目录检查
 

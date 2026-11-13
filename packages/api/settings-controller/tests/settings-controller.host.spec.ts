@@ -16,7 +16,7 @@ describe('settings Remote', () => {
     const { ctx, controller } = await boot()
     expect(controller.typertRemote.namespace).toBe('settings')
     expect(remoteMethods(controller).map(method => method.method)).toEqual([
-      'describe', 'update', 'replace', 'mutate', 'openSettingsDocument',
+      'describe', 'update', 'replace', 'mutate', 'prepareSettingsDocument', 'openSettingsDocument',
     ])
     expect(ctx.get('credentialsController')).toBeDefined()
   })
@@ -44,6 +44,12 @@ describe('settings Remote', () => {
     expect(() => controller.describe()).toThrow('settings service is absent')
     const failure = await controller.update('missing', {}, undefined).catch((error: unknown) => error)
     expect(remoteErrorOf(failure)?.code).toBe('gateway/internal')
+  })
+
+  it('prepares the profile patch path without launching a native editor', async () => {
+    const { controller, profile } = await boot()
+    await expect(controller.prepareSettingsDocument(new AbortController().signal))
+      .resolves.toEqual({ path: profile.patchPath })
   })
 
   it('opens the profile patch and contains opener failure and cancellation', async () => {
