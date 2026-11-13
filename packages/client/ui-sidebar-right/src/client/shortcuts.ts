@@ -2,6 +2,7 @@
 import type { Shortcuts, ShortcutBinding, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { GUIDE_KIND } from './contract/seed.ts'
 import type { SidebarRightController } from './service.ts'
 import type { SidebarRightTarget } from './focus.ts'
 import type {} from './locales.ts'
@@ -40,6 +41,26 @@ export function registerSidebarShortcuts(shortcuts: Pick<Shortcuts, 'register' |
       return { status: 'handled', run: () => { if (sidebar.isTargetCurrent(target)) sidebar.toggleExpanded() } }
     },
   })]
+  // The guide is the right sidebar's start page; this is the same ask as its
+  // add control, so a pane that already holds one settles on that tab.
+  const guideBinding: ShortcutBinding = { code: 'KeyT', modifiers: ['primary'] }
+  const webGuideBinding: ShortcutBinding = { code: 'KeyT', modifiers: ['primary', 'alt'] }
+  disposers.push(shortcuts.register({
+    id: 'page.newGuide' as ShortcutCommandId, label: () => t('command.newGuide'), aliases: ['new start page', 'new guide', 'new tab'],
+    defaults: {
+      'desktop:macos': guideBinding, 'desktop:windows': guideBinding, 'desktop:linux': guideBinding,
+      'web:macos': webGuideBinding, 'web:windows': webGuideBinding,
+    },
+    regions: ['page', 'editable', 'terminal'], modals: ['sidebar'],
+    resolve: () => {
+      const target = sidebar.commandTarget(null)
+      if (target === undefined) return { status: 'blocked', reason: t('command.noSession') }
+      return { status: 'handled', run: () => {
+        if (!sidebar.isTargetCurrent(target)) return
+        sidebar.openTab(GUIDE_KIND, { revealIfOpened: false })
+      } }
+    },
+  }))
   for (const kind of ['split', 'fullscreen'] as const) {
     const binding: ShortcutBinding = kind === 'split' ? { code: 'Backslash', modifiers: ['primary'] }
       : { code: 'Enter', modifiers: ['primary', 'alt'] }

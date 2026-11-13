@@ -518,16 +518,16 @@ describe('sidebar keyboard commands', () => {
   })
 
   it.each([
-    { platform: 'macos', keys: ['Shift+Meta+B', 'Meta+\\', 'Alt+Meta+Enter', 'Alt+Meta+W', undefined] },
-    { platform: 'windows', keys: ['Control+Shift+B', 'Control+\\', 'Control+Alt+Enter', 'Control+Alt+W', 'Control+Alt+R'] },
-    { platform: 'linux', keys: [undefined, undefined, undefined, undefined, undefined] },
+    { platform: 'macos', keys: ['Shift+Meta+B', 'Alt+Meta+T', 'Meta+\\', 'Alt+Meta+Enter', 'Alt+Meta+W', undefined] },
+    { platform: 'windows', keys: ['Control+Shift+B', 'Control+Alt+T', 'Control+\\', 'Control+Alt+Enter', 'Control+Alt+W', 'Control+Alt+R'] },
+    { platform: 'linux', keys: [undefined, undefined, undefined, undefined, undefined, undefined] },
   ] as const)('publishes the Web defaults and unbound commands on $platform', ({ platform, keys }) => {
     const h = harness()
     const registry = new ShortcutRegistry('web', platform)
     releases.push(registerSidebarShortcuts({ register: command => registry.register(command),
       runtime: registry.runtime }, h.controller, makeTranslate(en), vi.fn()))
     expect(registry.catalog.getSnapshot().map(row => row.id)).toEqual([
-      'sidebar.right.toggle', 'pane.split', 'pane.fullscreen.toggle', 'page.close', 'page.refresh',
+      'sidebar.right.toggle', 'page.newGuide', 'pane.split', 'pane.fullscreen.toggle', 'page.close', 'page.refresh',
     ])
     expect(registry.catalog.getSnapshot().map(row => row.aria)).toEqual(keys)
   })
