@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { GitStatusValue } from '@deepseek-ai/dsh-api-workspace-files'
 import { SourceControlBody } from '../src/client/SourceControlBody.tsx'
 import type { SourceControlBodyProps } from '../src/client/SourceControlBody.tsx'
+import { parseUnifiedPatch } from '../src/client/MonacoDiff.tsx'
 
 afterEach(cleanup)
 
@@ -27,11 +28,35 @@ function props(overrides: Partial<SourceControlBodyProps> = {}) {
   }))
   const stage = vi.fn(() => Promise.resolve({ ok: true as const, value: undefined }))
   const unstage = vi.fn(() => Promise.resolve({ ok: true as const, value: undefined }))
+  const useSessions = ((selector: (sessions: { byId: Record<string, { cwd?: string }> }) => unknown) =>
+    selector({ byId: { 's-git': { cwd: '/repo' } } })) as never
   return {
-    base: { sessionId: 's-git', readStatus, readDiff, stage, unstage, t } as unknown as SourceControlBodyProps,
+    base: { sessionId: 's-git', useSessions, readStatus, readDiff, stage, unstage, t } as unknown as SourceControlBodyProps,
     readStatus, readDiff, stage, unstage, ...overrides,
   }
 }
+
+describe('parseUnifiedPatch', () => {
+  it('reconstructs both sides and keeps hunk line numbers', () => {
+    const patch = [
+      'diff --git a/file.ts b/file.ts',
+      'index 111..222 100644',
+      '--- a/file.ts',
+      '+++ b/file.ts',
+      '@@ -1,2 +1,2 @@',
+      '-old',
+      '+new',
+      ' context',
+      '@@ -4,1 +4,1 @@',
+      '-before',
+      '+after',
+    ].join('\n')
+    expect(parseUnifiedPatch(patch)).toEqual({
+      original: 'old\ncontext\n\nbefore',
+      modified: 'new\ncontext\n\nafter',
+    })
+  })
+})
 
 describe('SourceControlBody', () => {
   it('groups staged, unstaged, and untracked paths and opens a file diff', async () => {

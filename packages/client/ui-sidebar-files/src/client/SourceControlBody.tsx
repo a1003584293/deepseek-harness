@@ -14,6 +14,7 @@ import {
 import type { GitDiffScope, GitDiffValue, GitStatusEntry, GitStatusValue } from '@deepseek-ai/dsh-api-workspace-files'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import { hasMonaco, MonacoDiff } from './MonacoDiff.tsx'
 import css from './SourceControlBody.module.css'
 import type {} from './locales.ts'
 
@@ -179,7 +180,8 @@ function DiffView({ diff, t }: { readonly diff: GitDiffValue; readonly t: Transl
  * @param props - the tab's Session, copy, and bound Git operations.
  * @returns the status groups above the selected file's diff.
  */
-export function SourceControlBody({ readStatus, readDiff, stage, unstage, t }: SourceControlBodyProps): ReactNode {
+export function SourceControlBody({ sessionId, useSessions, readStatus, readDiff, stage, unstage, t }: SourceControlBodyProps): ReactNode {
+  const cwd = useSessions(sessions => sessions.byId[sessionId]?.cwd)
   const [status, setStatus] = useState<GitStatusValue | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [selected, setSelected] = useState<{ readonly path: string; readonly scope: GitDiffScope } | undefined>(undefined)
@@ -189,10 +191,17 @@ export function SourceControlBody({ readStatus, readDiff, stage, unstage, t }: S
   const lifetime = useRef<AbortController | undefined>(undefined)
   const selectedRef = useRef(selected)
   selectedRef.current = selected
+  // The slot's inject face is stable for one occurrence, but keeping the
+  // operations in refs keeps the initial-load effect from re-arming on a
+  // hypothetical new identity and aborting its own read.
+  const readStatusRef = useRef(readStatus)
+  readStatusRef.current = readStatus
+  const readDiffRef = useRef(readDiff)
+  readDiffRef.current = readDiff
 
   const loadStatus = useCallback(async (signal: AbortSignal): Promise<void> => {
     try {
-      const result = await readStatus(signal)
+      const result = await readStatusRef.current(signal)
       if (signal.aborted) return
       if (result.ok) {
         setStatus(result.value)
@@ -201,19 +210,19 @@ export function SourceControlBody({ readStatus, readDiff, stage, unstage, t }: S
     } catch (cause: unknown) {
       if (!signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
     }
-  }, [readStatus])
+  }, [])
 
   const loadDiff = useCallback(async (path: string, scope: GitDiffScope, signal: AbortSignal): Promise<void> => {
     setDiffError(undefined)
     try {
-      const result = await readDiff(path, scope, signal)
+      const result = await readDiffRef.current(path, scope, signal)
       if (signal.aborted) return
       if (result.ok) setDiff(result.value)
       else setDiffError(result.error.message)
     } catch (cause: unknown) {
       if (!signal.aborted) setDiffError(cause instanceof Error ? cause.message : String(cause))
     }
-  }, [readDiff])
+  }, [])
 
   const restart = useCallback((path?: string, scope?: GitDiffScope): void => {
     lifetime.current?.abort()
@@ -266,7 +275,8 @@ export function SourceControlBody({ readStatus, readDiff, stage, unstage, t }: S
   if (status === undefined) {
     return (
       <div className={css.page} data-source-control>
-        <div className={css.error} role="alert">{error}</div>
+        <div className={css.error} role="alert" data-source-control-error>{error}</div>
+        {cwd === undefined ? null : <p className={css.note} data-source-control-cwd>{cwd}</p>}
         <button type="button" className={css.retry} onClick={() => { restart() }}>{t('git.retry')}</button>
       </div>
     )
@@ -311,7 +321,8 @@ export function SourceControlBody({ readStatus, readDiff, stage, unstage, t }: S
             ? <p className={css.note}>{t('git.select')}</p>
             : diffError !== undefined ? <p className={css.error}>{diffError}</p>
               : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
-                : <DiffView diff={diff} t={t} />}
+                : hasMonaco() && !diff.binary && diff.patch.trim().length > 0 ? <MonacoDiff diff={diff} />
+                  : <DiffView diff={diff} t={t} />}
         </div>
       </div>
     </div>
