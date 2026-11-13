@@ -243,6 +243,7 @@ export interface BottomTerminalInjected {
   }
   readonly view: (sessionId: SessionId, key: string, contentId: string) => TerminalView
   readonly closeView: (sessionId: SessionId, key: string, contentId: string, id?: WebTerminalId) => void
+  readonly retain: (tabs: readonly { sessionId: SessionId; tabId: string; contentId: string }[]) => void
   readonly setHeight: (height: number) => void
 }
 
@@ -266,7 +267,7 @@ function contentIdOf(sessionId: SessionId, key: string): string {
  * @returns the panel, or nothing while it is closed or has no Session.
  */
 export function BottomTerminal({
-  useActiveSession, useTheme, useOpen, useHeight, view, closeView, setHeight, t,
+  useActiveSession, useTheme, useOpen, useHeight, view, closeView, retain, setHeight, t,
 }: BottomTerminalProps): ReactNode {
   const sessionId = useActiveSession(value => value)
   const theme = useTheme(value => value)
@@ -275,6 +276,8 @@ export function BottomTerminal({
   const [tabs, setTabs] = useState<readonly BottomTab[]>([])
   const [activeKey, setActiveKey] = useState<string>()
   const next = useRef(1)
+  const retainRef = useRef(retain)
+  retainRef.current = retain
   const active = tabs.find(tab => tab.key === activeKey) ?? tabs[0]
   const model = sessionId === undefined || active === undefined ? undefined : view(sessionId, active.key, active.contentId)
   const state = useTerminalState(model)
@@ -295,6 +298,19 @@ export function BottomTerminal({
     if (model === undefined) return
     return model.mount()
   }, [model])
+
+  // A bottom terminal is not a sidebar tab, so the terminal service has no
+  // layout record to retain it. Register the dock's occurrences explicitly;
+  // without this hold the Host creation waits forever and the screen is blank.
+  useEffect(() => {
+    if (sessionId === undefined) {
+      retainRef.current([])
+      return
+    }
+    retainRef.current(tabs.map(tab => ({ sessionId, tabId: tab.key, contentId: tab.contentId })))
+  }, [tabs, sessionId])
+
+  useEffect(() => () => { retainRef.current([]) }, [])
 
   if (!open || sessionId === undefined) return null
 
@@ -358,8 +374,11 @@ export function BottomTerminal({
       }}>
         {state === undefined || model === undefined || active === undefined
           ? <p className={bottomCss.note}>{t('loading')}</p>
-          : <TerminalScreen state={state} model={model} tabKey={active.key} visible label={t('title')} theme={theme}
-            cwd={state.environment?.cwd} openSelectionMenu={() => {}} registerSelectionReader={() => () => {}} />}
+          : state.info === undefined
+            ? <p className={bottomCss.note}>{state.issue ?? state.error
+              ?? (state.phase === 'creating' ? t('creating') : state.phase === 'connecting' ? t('connecting') : t('loading'))}</p>
+            : <TerminalScreen state={state} model={model} tabKey={active.key} visible label={t('title')} theme={theme}
+              cwd={state.environment?.cwd} openSelectionMenu={() => {}} registerSelectionReader={() => () => {}} />}
       </div>
     </section>
   )

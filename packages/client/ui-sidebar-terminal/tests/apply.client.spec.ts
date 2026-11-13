@@ -207,7 +207,9 @@ it('retains terminal metadata from dormant layouts and releases its inventory su
   const h = await mountPlugin()
   const terminal = { sessionId: 'inactive' as SessionId, tabId: 't', kind: 'terminal', contentId: 'terminal' } as SidebarRightOpenTab
   h.openTabs.set([terminal, { ...terminal, kind: 'documentPreview', contentId: 'file' }])
-  await expect.poll(() => h.terminals.retainTabs).toHaveBeenLastCalledWith([terminal])
+  await expect.poll(() => h.terminals.retainTabs).toHaveBeenLastCalledWith([
+    { sessionId: 'inactive', tabId: 't', contentId: 'terminal' },
+  ])
   await h.dispose()
   expect(h.terminals.retainTabs).toHaveBeenLastCalledWith([])
   const calls = h.terminals.retainTabs.mock.calls.length

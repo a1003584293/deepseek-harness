@@ -312,12 +312,16 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     const platform = this.internals.platform ?? process.platform
     const activity = prepareShellActivity(spec, env, platform)
     const launch = activity === undefined ? spec : { ...spec, argv: activity.argv, env: activity.env }
+    const terminalEnv = { ...activity?.env ?? env, TERM: spec.terminalType }
     const options: IPtyForkOptions | IWindowsPtyForkOptions = {
       name: spec.terminalType,
       rows: spec.rows,
       cols: spec.cols,
       cwd: spec.cwd,
-      env: { ...activity?.env ?? env, TERM: spec.terminalType },
+      // A Finder-launched desktop Host has no LANG; without a UTF-8 locale the
+      // shell turns Chinese output into question marks. Respect an explicit
+      // caller locale and fill only the missing UTF-8 defaults.
+      env: { ...terminalEnv, ...terminalLocale(platform, terminalEnv) },
       // Windows' own console host (the standby pool runs Server 2022 and
       // Windows 10 22H2) renders the persistent-pwsh prompt tail in a form the
       // readiness path cannot match; the console host node-pty ships emits it
@@ -385,3 +389,10 @@ function environmentValue(env: NodeJS.ProcessEnv, name: 'PATH' | 'PATHEXT'): str
 }
 
 export default LocalSubprocessRuntime
+
+/** Add a UTF-8 shell locale when the launcher environment has none. */
+function terminalLocale(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): Record<string, string> {
+  if (platform === 'win32' || env.LC_ALL !== undefined || env.LANG !== undefined) return {}
+  const locale = platform === 'darwin' ? 'en_US.UTF-8' : 'C.UTF-8'
+  return { LANG: locale, LC_CTYPE: locale }
+}

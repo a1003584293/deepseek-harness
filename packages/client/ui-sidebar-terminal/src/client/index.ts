@@ -42,11 +42,18 @@ export function apply(ctx: Context): void {
   // let disposed = false
   // const recovered = new Map<SessionId, Promise<void>>()
   // ctx.effect(() => () => { disposed = true; recovered.clear() }, 'ui-sidebar-terminal.lifetime')
+  const bottomTabs = createSnapshotStore<readonly { sessionId: SessionId; tabId: string; contentId: string }[]>([])
   ctx.effect(() => {
-    const sync = (): void => { ctx.webTerminals.retainTabs(ctx.sidebarRight.openTabs.getSnapshot().filter(tab => tab.kind === 'terminal')) }
+    const sync = (): void => {
+      const sidebar = ctx.sidebarRight.openTabs.getSnapshot()
+        .filter(tab => tab.kind === 'terminal')
+        .map(tab => ({ sessionId: tab.sessionId, tabId: tab.tabId, contentId: tab.contentId }))
+      ctx.webTerminals.retainTabs([...sidebar, ...bottomTabs.getSnapshot()])
+    }
     const unsubscribe = ctx.sidebarRight.openTabs.subscribe(sync)
+    const unsubscribeBottom = bottomTabs.subscribe(sync)
     sync()
-    return () => { unsubscribe(); ctx.webTerminals.retainTabs([]) }
+    return () => { unsubscribe(); unsubscribeBottom(); ctx.webTerminals.retainTabs([]) }
   }, 'ui-sidebar-terminal.window-holds')
   const target = (sessionId: SessionId, key: string): SidebarRightTabParamsMap['terminal'] | undefined =>
     ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: key as TabId }).navigation.getSnapshot().params
@@ -166,6 +173,7 @@ export function apply(ctx: Context): void {
       hooks: { activeSession: ctx.sidebarRight.mounted, theme, open: bottomOpen, height: bottomHeight },
       view: (sessionId, key, contentId) => ctx.webTerminals.view(sessionId, key, contentId),
       closeView: (sessionId, key, contentId, id) => { ctx.webTerminals.close(sessionId, key, contentId, id) },
+      retain: (tabs) => { bottomTabs.set(tabs) },
       setHeight: (value) => { bottomHeight.set(value) },
     }),
   }, BottomTerminal)), 'ui-sidebar-terminal: bottom dock')
