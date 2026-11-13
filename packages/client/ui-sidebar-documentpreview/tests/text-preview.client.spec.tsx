@@ -874,7 +874,11 @@ describe('TextPreview — workspace navigator Factories', () => {
     const view = render(<TextPreview {...props} renderFactorySlot={renderFactorySlot} useDocumentPreviews={none} />)
     expect(renderFactorySlot.mock.calls).toEqual([
       ['sidebar.files.navigator.toggle', { useTabInfo: props.useTabInfo }],
-      ['sidebar.files.navigator', { useTabInfo: props.useTabInfo, page: false, onOpen: expect.any(Function) as FileNavigatorInput['onOpen'] }],
+      ['sidebar.files.navigator', {
+        useTabInfo: props.useTabInfo, page: false,
+        onOpen: expect.any(Function) as FileNavigatorInput['onOpen'],
+        onEdit: expect.any(Function) as FileNavigatorInput['onEdit'],
+      }],
     ])
     expect(view.container.querySelector('[data-textpreview-state="loading"]')).not.toBeNull()
     expect(seats(view.container)).toEqual({

@@ -26,7 +26,8 @@ import { FileNavigator } from '../src/client/FileNavigator.tsx'
 import { FilesBody } from '../src/client/FilesBody.tsx'
 import { FilesTitle } from '../src/client/FilesTitle.tsx'
 import { NavigatorToggle } from '../src/client/NavigatorToggle.tsx'
-import { GIT_ID, SourceControlBody, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
+import { GIT_ID, SourceControlPage, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
+import { EDITOR_ID, EditFileAction, EditorBody, EditorTitle } from '../src/client/EditorBody.tsx'
 import { en, ja, zh, es, fr, de, ru, pt } from '../src/client/locales.ts'
 import type { createFilesStore } from '../src/client/store.ts'
 
@@ -72,6 +73,7 @@ async function boot() {
     }),
   }
   const workspaceFiles = { list: vi.fn(), search: vi.fn(), stat: vi.fn() }
+  const gitPanel = { status: vi.fn(), diff: vi.fn(), stage: vi.fn(), unstage: vi.fn() }
   const navigation = createSnapshotStore({ address: 'sidebar://files', params: undefined, revision: 0 })
   const source = {
     getSnapshot: () => navigation.getSnapshot(),
@@ -96,8 +98,9 @@ async function boot() {
   ctx.provide('sidebarRightTabs', tabs as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
-  ctx.provide('remote', { workspaceFiles, $host: { home: HOME, isLoopback: true } } as never)
+  ctx.provide('remote', { workspaceFiles, gitPanel, $host: { home: HOME, isLoopback: true } } as never)
   ctx.provide('remote.workspaceFiles', workspaceFiles as never)
+  ctx.provide('remote.gitPanel', gitPanel as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   return { ctx, tabs, registered, dictionaries, fiber, sidebar, commands, slots, navigation, source, workspaceFiles }
@@ -292,15 +295,21 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.right.pane.tab.title', FILES_ID, undefined],
       ['sidebar.right.pane.tab', GIT_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', GIT_ID, undefined],
+      ['sidebar.right.pane.tab', EDITOR_ID, 'sidebarFiles'],
+      ['sidebar.right.pane.tab.title', EDITOR_ID, undefined],
+      ['sidebar.right.tab.document.actions', undefined, 'sidebarFiles'],
       ['shell.overlay', undefined, 'sidebarFiles'],
     ])
     expect(slots.registerFactory.mock.calls.map(([options]) => [options.name, options.scope]))
       .toEqual([['sidebar.files.tree', 'root'], ['sidebar.files.navigator', 'session'], ['sidebar.files.navigator.toggle', 'session']])
-    const [tree, factory, toggle, body, title, gitBody, gitTitle, palette] = registered
+    const [tree, factory, toggle, body, title, gitBody, gitTitle, editorBody, editorTitle, editAction, palette] = registered
     expect([
       factory?.component, toggle?.component, body?.component, title?.component,
-      gitBody?.component, gitTitle?.component, palette?.component,
-    ]).toEqual([FileNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlBody, SourceControlTitle, QuickOpen])
+      gitBody?.component, gitTitle?.component, editorBody?.component, editorTitle?.component, editAction?.component, palette?.component,
+    ]).toEqual([
+      FileNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlPage, SourceControlTitle,
+      EditorBody, EditorTitle, EditFileAction, QuickOpen,
+    ])
     expect(tree?.component).toBe(FileTree)
     expect(slots.registerFactory.mock.calls[0]?.[0]).toMatchObject({ slots: { accessory: { scope: 'root' } } })
     // One store handle for the Factory, the toggle and the page.

@@ -24,7 +24,7 @@ import { posix, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-fs'
-import type { FsDirEntry, FsInfo, FsPathInfo, FsTarget } from '@deepseek-ai/dsh-fs'
+import type { FsDirEntry, FsInfo, FsPathInfo, FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -39,12 +39,14 @@ import type {
   WorkspaceDirectoryEntry,
   WorkspaceDirectoryListing,
   WorkspaceFileBytes,
+  WorkspaceFileDocument,
   WorkspaceFileRange,
   WorkspaceFileSearchRequest,
   WorkspaceFileSearchResult,
   WorkspaceFileStat,
   WorkspaceFileText,
   WorkspaceFileWatchFrame,
+  WorkspaceFileWrite,
 } from './types.ts'
 
 export { GitPanel, gitEntryStaged, gitEntryUnstaged, gitEntryUntracked, parseGitStatus } from './git-panel.ts'
@@ -262,6 +264,91 @@ export class WorkspaceFiles extends TypertRemoteService {
     }
     return { ...this.statOf(target, info), offset, text: page.text, lines: page.lines, eof: page.eof }
   }
+
+
+  /**
+   * Read one complete UTF-8 file for an editor.
+   *
+   * The page reader stops at a line window; an editor needs the whole document
+   * plus the version that guards its first save.
+   * @param workspaceFileScope - header-derived workspace root for the Session identity on the wire.
+   * @param path - absolute path or path relative to the workspace root; files outside it are allowed.
+   * @param signal - caller cancellation.
+   * @returns the complete text, its version, and the file's stat.
+   */
+  @Remote
+  async readDocument(
+    workspaceFileScope: WorkspaceFileScope,
+    path: string,
+    signal: AbortSignal,
+  ): Promise<WorkspaceFileDocument> {
+    const { target, info } = await this.locateFile(workspaceFileScope, path, signal)
+    const limit = this.config.maxFileBytes
+    if (info.size !== undefined && info.size > limit) {
+      throw new RemoteError('workspace-file/too-large', `"${path}" exceeds the ${limit} byte editor cap`, { path, limit })
+    }
+    const text = await this.ctx.fs.readText(target, signal).catch((cause: unknown) => {
+      if (isNotTextRefusal(cause)) {
+        throw new RemoteError('workspace-file/not-text', `"${path}" is not UTF-8 text`, { path }, { cause })
+      }
+      if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'FS_TOO_LARGE') {
+        throw new RemoteError('workspace-file/too-large', `"${path}" exceeds the ${limit} byte editor cap`, { path, limit }, { cause })
+      }
+      throw cause
+    })
+    return { ...this.statOf(target, info), text }
+  }
+
+  /**
+   * Replace one complete UTF-8 file, optionally guarded by the version the
+   * editor loaded.
+   * @param workspaceFileScope - header-derived workspace root for the Session identity on the wire.
+   * @param path - absolute path or path relative to the workspace root; files outside it are allowed.
+   * @param text - the complete replacement text.
+   * @param expectedVersion - version from the load; a mismatch is a conflict, not a silent overwrite.
+   * @param signal - caller cancellation.
+   * @returns the new version and whether the write created or updated the file.
+   */
+  @Remote
+  async writeDocument(
+    workspaceFileScope: WorkspaceFileScope,
+    path: string,
+    text: string,
+    expectedVersion: string | undefined,
+    signal: AbortSignal,
+  ): Promise<WorkspaceFileWrite> {
+    const { target } = await this.locateFile(workspaceFileScope, path, signal)
+    const limit = this.config.maxFileBytes
+    const bytes = Buffer.byteLength(text, 'utf8')
+    if (bytes > limit) {
+      throw new RemoteError('workspace-file/too-large', `the new text exceeds the ${limit} byte editor cap`, { path, limit })
+    }
+    const expected = expectedVersion === undefined
+      ? undefined
+      : { kind: 'replaceIfVersion' as const, version: expectedVersion as FsVersion }
+    // The editor writes inside the Session workspace under the same fence the
+    // Agent's workspace-write policy uses; the read path stays unfenced.
+    const policy = {
+      mode: 'workspace-write' as const,
+      workspaceRoot: workspaceFileScope.workspaceRoot,
+      sessionId: workspaceFileScope.sessionId,
+    }
+    const outcome = await this.ctx.fs.writeText(target, text, expected, signal, policy).catch((cause: unknown) => {
+      if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'FS_STALE_VERSION') {
+        throw new RemoteError('workspace-file/stale-version', `"${path}" changed after it was loaded`, { path }, { cause })
+      }
+      if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'FS_TOO_LARGE') {
+        throw new RemoteError('workspace-file/too-large', `the new text exceeds the ${limit} byte editor cap`, { path, limit }, { cause })
+      }
+      throw cause
+    })
+    return {
+      absolutePath: this.ctx.fs.processPath(target),
+      version: outcome.version,
+      operation: outcome.operation,
+    }
+  }
+
 
   /**
    * Read a complete regular file or one byte range without text decoding.

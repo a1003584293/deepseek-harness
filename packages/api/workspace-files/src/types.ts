@@ -64,6 +64,22 @@ export interface WorkspaceFileText extends WorkspaceFileStat {
   readonly eof: boolean
 }
 
+/** One complete UTF-8 document as an editor loads it. */
+export interface WorkspaceFileDocument extends WorkspaceFileStat {
+  /** The complete decoded text, without a synthetic trailing newline. */
+  readonly text: string
+}
+
+/** The outcome of replacing one complete document. */
+export interface WorkspaceFileWrite {
+  /** Absolute path of the written file in the filesystem's execution world. */
+  readonly absolutePath: string
+  /** Opaque version of the file after the write. */
+  readonly version: string
+  /** Whether the write created the file or replaced existing content. */
+  readonly operation: 'create' | 'update'
+}
+
 /** The byte window one `readBytes` returns. Offsets are 0-based. */
 export interface WorkspaceByteRange {
   /** First byte of the window. Defaults to 0. */
@@ -211,6 +227,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'workspace-file/watch-unsupported': { readonly path: string }
     /** No entry exists at that path inside the workspace. */
     'workspace-file/not-found': { readonly path: string }
+    /** A save carried a version that no longer matches the file on disk. */
+    'workspace-file/stale-version': { readonly path: string }
     /** The directory listing or watch path resolves outside the Session's workspace root. */
     'workspace-file/outside-workspace': { readonly path: string }
     /** The requested page exceeds the configured byte cap; nothing is returned. */

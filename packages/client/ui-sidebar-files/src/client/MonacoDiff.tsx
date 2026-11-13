@@ -9,29 +9,12 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { GitDiffValue } from '@deepseek-ai/dsh-api-workspace-files'
+import { monaco } from './monaco-api.ts'
 import css from './MonacoDiff.module.css'
-
-interface MonacoModel {
-  dispose(): void
-}
-
-interface MonacoDiffEditor {
-  setModel(model: { original: MonacoModel; modified: MonacoModel }): void
-  dispose(): void
-}
-
-interface MonacoApi {
-  editor: {
-    createModel(value: string, language?: string): MonacoModel
-    createDiffEditor(container: HTMLElement, options: Record<string, unknown>): MonacoDiffEditor
-  }
-}
-
-type MonacoScope = typeof globalThis & { __DSH_MONACO__?: MonacoApi }
 
 /** The shell-owned Monaco vendor, if the Web entry mounted it. */
 export function hasMonaco(): boolean {
-  return (globalThis as MonacoScope).__DSH_MONACO__ !== undefined
+  return monaco() !== undefined
 }
 
 /**
@@ -81,7 +64,7 @@ export function parseUnifiedPatch(patch: string): { original: string; modified: 
 export function MonacoDiff({ diff }: { readonly diff: GitDiffValue }): ReactNode {
   const hostRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    const api = (globalThis as MonacoScope).__DSH_MONACO__
+    const api = monaco()
     const host = hostRef.current
     if (api === undefined || host === null || diff.binary) return
     const { original, modified } = parseUnifiedPatch(diff.patch)

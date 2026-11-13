@@ -9,6 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import z from '@deepseek-ai/schemastery'
 
@@ -150,8 +151,13 @@ export class GitPanel extends TypertRemoteService {
     else await this.run(root, ['rm', '-r', '--cached', '-q', '--', ...clean], signal)
   }
 
-  private workspaceOf(sessionId: SessionId): string {
-    const cwd = this.ctx.sessions.get(sessionId)?.header.cwd
+  private async workspaceOf(sessionId: SessionId, signal: AbortSignal): Promise<string> {
+    const live = this.ctx.sessions.get(sessionId)?.header.cwd
+    if (live !== undefined && live !== '') return live
+    // A restored Session can be inspected before its Agent is activated; its
+    // header still names the workspace on disk.
+    const stored = await this.ctx.get('sessionPersistence')?.stat(sessionId, { signal })
+    const cwd = stored?.header.cwd
     if (cwd === undefined || cwd === '') {
       throw new RemoteError('git-panel/no-workspace', 'The Session has no workspace directory', {})
     }
@@ -160,7 +166,7 @@ export class GitPanel extends TypertRemoteService {
 
   /** Resolve the repository root; every path on the wire is root-relative. */
   private async repositoryOf(sessionId: SessionId, signal: AbortSignal): Promise<string> {
-    const cwd = this.workspaceOf(sessionId)
+    const cwd = await this.workspaceOf(sessionId, signal)
     const found = await this.run(cwd, ['rev-parse', '--show-toplevel'], signal)
     const root = found.stdout.trim()
     if (root.length === 0) throw new RemoteError('git-panel/not-a-repository', 'Git did not report a repository root', {})

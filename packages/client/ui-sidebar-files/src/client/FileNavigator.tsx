@@ -37,6 +37,8 @@ export interface FileNavigatorInput {
   readonly page: boolean
   /** Ask the containing plugin to open a file. @param address - the file's resource address. */
   readonly onOpen: (address: string) => void
+  /** Ask the containing plugin to edit a file. @param address - the file's resource address. */
+  readonly onEdit?: ((address: string) => void) | undefined
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -166,7 +168,7 @@ function SearchFailure({ failure, onRetry, t }: {
  * @returns the navigator, or nothing while hidden or without a workspace.
  */
 export function FileNavigator({
-  useTabInfo, page, onOpen, sessionId, useSessions, useStore, actions, useRowWidth, useCanOpen, useSearchPreferences, useEditorSide,
+  useTabInfo, page, onOpen, onEdit, sessionId, useSessions, useStore, actions, useRowWidth, useCanOpen, useSearchPreferences, useEditorSide,
   attach, placeBeside, hold, toggle, scrolled, bodyDrawn, currentDrawn, navigatorDrawn,
   setQuery, toggleSearch, retrySearch, setSearchPreferences, searchDrawn, t, renderFactorySlot, useContextMenu,
 }: FactoryComponentPropsOf<'sidebar.files.navigator'>): ReactNode {
@@ -259,12 +261,13 @@ export function FileNavigator({
       expanded: tree.expanded,
       onToggle: (entry: TreeEntry) => { toggle(paneId, parentOf(tree, entry.path), entry.path, tree.expanded) },
       onOpen: (entry: TreeEntry) => { onOpen(fileAddressFor(sessionId, tree.root, entry.path)) },
+      onEdit: onEdit === undefined ? undefined : (entry: TreeEntry) => { onEdit(fileAddressFor(sessionId, tree.root, entry.path)) },
       canOpen: (entry: TreeEntry) => canOpen(fileAddressFor(sessionId, tree.root, entry.path)),
       rowTriggerProps: (entry: TreeEntry, kind: 'file' | 'directory') => getTriggerProps(kind === 'directory'
         ? { kind, value: { sessionId, path: entry.path } }
         : { kind, value: { sessionId, path: entry.path, paneId } }),
     }
-  }, [tree, paneId, sessionId, toggle, canOpen, onOpen, getTriggerProps])
+  }, [tree, paneId, sessionId, toggle, canOpen, onOpen, onEdit, getTriggerProps])
   // The results keep their own expansion; every other gesture acts as on the tree.
   const resultView = useMemo(() => view === undefined || resultTree === undefined ? undefined : {
     ...view,

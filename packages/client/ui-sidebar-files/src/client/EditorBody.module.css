@@ -1,0 +1,125 @@
+/* Editable document page. */
+.page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.path {
+  display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirty {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-secondary);
+}
+
+.action {
+  flex: none;
+  padding: 2px 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  background: transparent;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-l2);
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.host {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fallback {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  color: var(--dsw-alias-label-primary);
+  font: 12px/1.5 var(--dsw-font-family-mono, ui-monospace, monospace);
+  background: var(--dsw-alias-bg-base);
+  border: 0;
+  outline: none;
+  resize: none;
+}
+
+.note {
+  margin: 0;
+  padding: 10px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.error {
+  flex: none;
+  margin: 6px 10px;
+  padding: 6px 8px;
+  color: var(--dsw-alias-label-danger, #d33);
+  font-size: 12px;
+  background: var(--dsw-alias-bg-l2);
+  border-radius: 6px;
+}
+
+.previewAction {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.previewAction:hover {
+  background: var(--dsw-alias-bg-l2);
+}
+
+.titleIcon {
+  flex: none;
+}
+
+.titleText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

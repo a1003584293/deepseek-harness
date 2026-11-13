@@ -17,6 +17,7 @@ import {
   IconPauseOutlineRegular, IconPlayOutlineRegular, IconRefreshOutlineRegular, IconSearchOutlineRegular, PathLabel, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FilesInjected } from './face.ts'
+import { EDITOR_KIND } from './EditorBody.tsx'
 import type {} from './FileNavigator.tsx'
 import type {} from './locales.ts'
 import type { createFilesStore } from './store.ts'
@@ -47,6 +48,9 @@ export function FilesBody(props: FilesBodyProps): ReactNode {
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
   }, [tab.actions, panel.id, panel.isFloating])
+  const onEdit = useCallback((address: string): void => {
+    tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+  }, [tab.actions, panel.id, panel.isFloating])
   useEffect(
     () => tab.actions.bindCommands({ refresh: () => { refresh(panel.id) } }),
     [tab.actions, panel.id, refresh],
@@ -68,7 +72,7 @@ export function FilesBody(props: FilesBodyProps): ReactNode {
     )
   }
   const automatic = autoRefresh ?? true
-  const navigator = renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: true, onOpen })
+  const navigator = renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: true, onOpen, onEdit })
   return (
     <div className={css.page} data-files-page>
       <div className={css.header}>

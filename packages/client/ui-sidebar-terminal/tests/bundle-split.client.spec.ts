@@ -11,8 +11,10 @@ describe('terminal client artifacts', () => {
     expect(existsSync(terminalPath)).toBe(true)
     const entry = readFileSync(entryPath, 'utf8')
     const terminal = readFileSync(terminalPath, 'utf8')
-    expect([...entry.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
-      .toEqual(['./client.terminal.js'])
+    const asyncChunks = [...entry.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2])
+    // Both the sidebar screen and the bottom dock load xterm asynchronously.
+    expect(asyncChunks).toContain('./client.terminal.js')
+    expect(asyncChunks.length).toBeGreaterThanOrEqual(1)
     expect(entry).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
     expect([...terminal.matchAll(/require\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
       .toEqual([])

@@ -5,7 +5,7 @@
  * The page is deliberately view-and-index only: Git execution belongs to the
  * Host Remote, and the browser renders the patch it returns.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -327,4 +327,35 @@ export function SourceControlBody({ sessionId, useSessions, readStatus, readDiff
       </div>
     </div>
   )
+}
+
+/** Keep one crashing body from abdicating the whole keyed tab cell and blanking the pane. */
+class SourceControlBoundary extends Component<{ readonly children: ReactNode }, { readonly error?: Error }> {
+  override state: { readonly error?: Error } = {}
+
+  static getDerivedStateFromError(error: Error): { readonly error: Error } {
+    return { error }
+  }
+
+  override componentDidCatch(error: Error): void {
+    console.error('source control body crashed', error)
+  }
+
+  override render(): ReactNode {
+    if (this.state.error === undefined) return this.props.children
+    return (
+      <div className={css.page} data-source-control>
+        <div className={css.error} role="alert" data-source-control-crash>{this.state.error.message}</div>
+      </div>
+    )
+  }
+}
+
+/**
+ * The registered source-control body: the page plus a local crash face.
+ * @param props - the slot's Session, copy, and bound Git operations.
+ * @returns the page or its error message.
+ */
+export function SourceControlPage(props: SourceControlBodyProps): ReactNode {
+  return <SourceControlBoundary><SourceControlBody {...props} /></SourceControlBoundary>
 }

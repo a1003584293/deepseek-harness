@@ -18,6 +18,7 @@ import { TerminalGuide, type TerminalGuideInjected } from '../src/client/Termina
 import { LazyTerminalBody } from '../src/client/LazyTerminalBody.tsx'
 import { TerminalTitle } from '../src/client/TerminalTitle.tsx'
 import { AgentTerminalOpener, type AgentTerminalOpenerInjected } from '../src/client/AgentTerminalOpener.tsx'
+import { BottomTerminal } from '../src/client/BottomTerminal.tsx'
 import type { TerminalBodyInjected } from '../src/client/face.ts'
 import { en, ja, zh, es, fr, de, ru, pt } from '../src/client/locales.ts'
 
@@ -120,19 +121,29 @@ it('registers terminal views and the agent terminal opener without recovery or c
     expect(definition.multiple).toBe(true)
     expect(h.dictionaries.get('sidebarTerminal')).toEqual({ en, zh, ja, es, fr, de, ru, pt })
     expect(h.entries.map(entry => [entry.name, entry.component, entry.locale])).toEqual([
+      ['shell.bottom', BottomTerminal, 'sidebarTerminal'],
       ['sidebar.right.tab.guide.entry', TerminalGuide, 'sidebarTerminal'],
       ['sidebar.right.pane.tab', LazyTerminalBody, 'sidebarTerminal'],
       ['sidebar.right.pane.tab.title', TerminalTitle, 'sidebarTerminal'],
       ['conversation.session.header.actions', AgentTerminalOpener, 'sidebarTerminal'],
     ])
+    const bottom = h.commands.find(command => command.id === 'terminal.bottom.toggle')
+    if (bottom === undefined) throw new Error('bottom terminal command was not registered')
+    expect(bottom.defaults['desktop:macos']).toEqual({ code: 'KeyJ', modifiers: ['meta'] })
+    const injectedBottom = (h.entries[0]!.inject as () => { hooks: { open: { getSnapshot(): boolean } } })()
+    expect(injectedBottom.hooks.open.getSnapshot()).toBe(false)
+    const toggled = bottom.resolve({ region: 'page', modal: null, target: null })
+    if (toggled.status !== 'handled') throw new Error('bottom terminal command was not available')
+    toggled.run()
+    expect(injectedBottom.hooks.open.getSnapshot()).toBe(true)
     const sessionId = 'session' as SessionId
-    const launcher = h.entries[0]!.inject(sessionId) as TerminalGuideInjected
+    const launcher = h.entries[1]!.inject(sessionId) as TerminalGuideInjected
     const signal = new AbortController().signal
     await launcher.loadShells(signal)
     expect(h.terminals.launchShells).toHaveBeenCalledWith(sessionId, signal)
     launcher.selectShell('/bin/bash')
     expect(h.terminals.selectShell).toHaveBeenCalledWith('/bin/bash')
-    const face = h.entries[1]!.inject(sessionId) as TerminalBodyInjected
+    const face = h.entries[2]!.inject(sessionId) as TerminalBodyInjected
     expect(face.hooks.theme.getSnapshot()).toBe(h.theme)
     const changed = vi.fn()
     const unsubscribe = face.hooks.theme.subscribe(changed)

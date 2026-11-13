@@ -15,6 +15,8 @@ import { TerminalGuide, type TerminalGuideInjected } from './TerminalGuide.tsx'
 import { LazyTerminalBody } from './LazyTerminalBody.tsx'
 import { TerminalTitle } from './TerminalTitle.tsx'
 import { AgentTerminalOpener, type AgentTerminalOpenerInjected } from './AgentTerminalOpener.tsx'
+import { BottomTerminal, type BottomTerminalInjected } from './BottomTerminal.tsx'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // import { TerminalRecovery, type TerminalRecoveryInjected } from './TerminalRecovery.tsx'
 // import { TerminalCleanup, type TerminalCleanupInjected } from './TerminalCleanup.tsx'
 import type { TerminalBodyInjected, TerminalInjected } from './face.ts'
@@ -77,6 +79,20 @@ export function apply(ctx: Context): void {
       return { status: 'handled', run: () => { ctx.sidebarRight.openTabFromTarget('terminal', target) } }
     },
   }), 'ui-sidebar-terminal: shortcut')
+  ctx.effect(() => ctx.shortcuts.register({
+    id: 'terminal.bottom.toggle' as ShortcutCommandId,
+    label: () => t('bottomToggle'), aliases: ['toggle bottom terminal', 'panel terminal'],
+    defaults: {
+      'desktop:macos': { code: 'KeyJ', modifiers: ['meta'] },
+      'desktop:windows': { code: 'KeyJ', modifiers: ['control'] },
+      'desktop:linux': { code: 'KeyJ', modifiers: ['control'] },
+    },
+    regions: ['page', 'editable', 'terminal'], modals: [],
+    resolve: () => ({
+      status: 'handled',
+      run: () => { bottomOpen.set(!bottomOpen.getSnapshot()) },
+    }),
+  }), 'ui-sidebar-terminal: bottom toggle')
   ctx.effect(() => ctx.locale.register(namespace, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-terminal.copy')
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id, kind: 'terminal', multiple: true, priority: 'builtin', title: () => t('title'),
@@ -141,6 +157,18 @@ export function apply(ctx: Context): void {
     getSnapshot: () => ctx.theme.getTheme(),
     subscribe: listener => ctx.on('theme/change', listener),
   }
+  // The bottom dock owns its open/height state independently of sidebar tabs.
+  const bottomOpen = createSnapshotStore(false)
+  const bottomHeight = createSnapshotStore(280)
+  ctx.effect(() => ctx.slots.inject('shell.bottom', () => ctx.slots.register({
+    name: 'shell.bottom', locale: namespace,
+    inject: (): BottomTerminalInjected => ({
+      hooks: { activeSession: ctx.sidebarRight.mounted, theme, open: bottomOpen, height: bottomHeight },
+      view: (sessionId, key, contentId) => ctx.webTerminals.view(sessionId, key, contentId),
+      closeView: (sessionId, key, contentId, id) => { ctx.webTerminals.close(sessionId, key, contentId, id) },
+      setHeight: (value) => { bottomHeight.set(value) },
+    }),
+  }, BottomTerminal)), 'ui-sidebar-terminal: bottom dock')
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.guide.entry', () => ctx.slots.register({
     name: 'sidebar.right.tab.guide.entry', key: id, locale: namespace,
     inject: (sessionId): TerminalGuideInjected => ({

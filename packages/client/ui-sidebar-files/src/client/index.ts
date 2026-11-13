@@ -31,8 +31,11 @@ import { QuickOpen, type QuickOpenInjected } from './QuickOpen.tsx'
 import { expandQuickOpenPath, quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
 import { createSearchPreferenceBook, SEARCH_PREFERENCES_KEY } from './search-preferences.ts'
 import {
-  GIT_ID, SourceControlBody, SourceControlTitle, sourceControlDefinition, type GitInjected,
+  GIT_ID, SourceControlPage, SourceControlTitle, sourceControlDefinition, type GitInjected,
 } from './SourceControlBody.tsx'
+import {
+  EDITOR_ID, EDITOR_KIND, EditFileAction, EditorBody, EditorTitle, editorDefinition, type EditFileActionInjected, type EditorInjected,
+} from './EditorBody.tsx'
 import { createFilesStore } from './store.ts'
 
 export type { SidebarFilesKey } from './locales.ts'
@@ -68,7 +71,7 @@ const NS = 'sidebarFiles'
  * Required browser services: the tab registry, the keyed seat, the Remote
  * carrier and its namespace, and copy.
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'layout']
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'remote.gitPanel', 'layout']
 
 /**
  * Client plugin body: register the type, its shortcut, its dictionaries, the
@@ -210,22 +213,52 @@ export function apply(ctx: ClientContext): void {
   // Source control is a page in the same dock: the tab body renders the status
   // groups and the selected patch; Git execution stays behind the Remote.
   const gitInjected = (sessionId: SessionId): GitInjected => {
-    const git = ctx.remote.gitPanel
+    // Resolve the namespace inside every call: an absent Host namespace must
+    // surface as a page error, not crash the slot inject face and blank the
+    // whole pane.
+    const git = (): NonNullable<typeof ctx.remote.gitPanel> => {
+      const panel = Reflect.get(ctx.remote, 'gitPanel') as (typeof ctx.remote.gitPanel) | undefined
+      if (panel === undefined) throw new Error('source control is unavailable: the gitPanel Remote is not mounted')
+      return panel
+    }
     return {
-      readStatus: signal => git.status(sessionId, signal),
-      readDiff: (path, scope, signal) => git.diff(sessionId, path, scope, signal),
-      stage: (paths, signal) => git.stage(sessionId, [...paths], signal),
-      unstage: (paths, signal) => git.unstage(sessionId, [...paths], signal),
+      readStatus: signal => git().status(sessionId, signal),
+      readDiff: (path, scope, signal) => git().diff(sessionId, path, scope, signal),
+      stage: (paths, signal) => git().stage(sessionId, [...paths], signal),
+      unstage: (paths, signal) => git().unstage(sessionId, [...paths], signal),
     }
   }
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
     { name: 'sidebar.right.pane.tab', key: GIT_ID, locale: NS, inject: gitInjected },
-    SourceControlBody,
+    SourceControlPage,
   )), 'ui-sidebar-files: source control tab body')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
     { name: 'sidebar.right.pane.tab.title', key: GIT_ID },
     SourceControlTitle,
   )), 'ui-sidebar-files: source control tab title')
+  // Editable files open as their own page. The document preview stays
+  // read-only; a double-click (or the preview's edit action) asks for this tab.
+  const editorInjected = (sessionId: SessionId): EditorInjected => ({
+    readDocument: (path, signal) => ctx.remote.workspaceFiles.readDocument(sessionId, path, signal),
+    writeDocument: (path, text, expectedVersion, signal) =>
+      ctx.remote.workspaceFiles.writeDocument(sessionId, path, text, expectedVersion, signal),
+  })
+  const editorType = editorDefinition(t)
+  ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab', key: EDITOR_ID, locale: NS, inject: editorInjected },
+    EditorBody,
+  )), 'ui-sidebar-files: editor tab body')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: EDITOR_ID },
+    EditorTitle,
+  )), 'ui-sidebar-files: editor tab title')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({
+    name: 'sidebar.right.tab.document.actions', id: EDITOR_ID, locale: NS,
+    inject: (sessionId): EditFileActionInjected => ({
+      openEditor: (path) => { ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } }) },
+    }),
+  }, EditFileAction)), 'ui-sidebar-files: preview edit action')
 
   // Quick open: a VS Code-style palette over recent files and the workspace.
   // The sequence value only says "opened again", so one entry resets its query.

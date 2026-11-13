@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用本包可从 Web Client 预览 Session 文件系统允许读取的文件。它按页读取 UTF-8 文本、按有界窗口或完整文件读取原始字节、从基文件目录解析关联文件，并报告文件元数据。可以跟随一个文件或一个目录直接子项的变化。可以按名称或相对路径搜索工作区条目。文件读取和监听可以指向工作区外路径；目录列举、搜索和目录监听仍限定于工作区。同一包还挂载桌面源代码管理页所用的 `gitPanel` 命名空间：仓库状态、单个文件的统一 diff，以及索引的暂存/取消暂存。文件读取面不提供修改；只有 Git 命名空间会修改索引。
+使用本包可从 Web Client 预览 Session 文件系统允许读取的文件。它按页读取 UTF-8 文本、按有界窗口或完整文件读取原始字节、从基文件目录解析关联文件，并报告文件元数据。可以跟随一个文件或一个目录直接子项的变化。可以按名称或相对路径搜索工作区条目。文件读取和监听可以指向工作区外路径；目录列举、搜索和目录监听仍限定于工作区。同一包还挂载桌面源代码管理页所用的 `gitPanel` 命名空间：仓库状态、单个文件的统一 diff，以及索引的暂存/取消暂存。文本预览仍然只读；`readDocument` 与 `writeDocument` 提供一条整文件编辑通道，只有编辑器和 Git 命名空间会修改磁盘状态。
 
 ## 目录
 
@@ -32,6 +32,8 @@ kind: "package-reference"
 | `stat(path)` | `WorkspaceFileStat { absolutePath, version, bytes? }` | 一个普通文件的身份、版本与大小，不含内容 |
 | `read(path, { offset?, limit? })` | `WorkspaceFileText` = stat + `{ offset, text, lines, eof }` | UTF-8 文本文件的一个行窗口；`lines` 计行数，使单个空行与越过文件末尾的页可区分 |
 | `readBytes(path, { range?, baseFile? })` | `WorkspaceFileBytes` = stat + `{ offset, data, eof }` | 以 `Uint8Array` 返回完整文件或有界字节范围；可从另一个文件所在目录解析目标 |
+| `readDocument(path)` | `WorkspaceFileDocument` = stat + `{ text }` | 供 Monaco 编辑器使用的完整 UTF-8 文档，受编辑器字节上限约束 |
+| `writeDocument(path, text, expectedVersion)` | `WorkspaceFileWrite { absolutePath, version, operation }` | 在 Session 的 workspace-write 围栏下替换完整文档；版本过期即冲突 |
 | `list(path)` | `WorkspaceDirectoryListing { path, entries, truncated }` | 一个目录的直接子项 |
 | `search({ query, excludedPaths, includeHidden, respectGitignore })` | `WorkspaceFileSearchResult { matches, truncated, incomplete }` | 工作区任意位置中名称或相对路径包含查询的条目 |
 | `changes(path)` | `WorkspaceFileWatchFrame` 流 | 订阅就绪确认，随后为单个文件或目录直接子项的失效通知 |
@@ -49,6 +51,10 @@ kind: "package-reference"
 `read` 按行分页，绝不按字节；字节窗口走 `readBytes(path, { range: { offset?, length? } })`。`options.range.offset` 是 0 起算的首字节，缺省为 0；`options.range.length` 是窗口最多的字节数，缺省为 `maxBytes` 且不得超过它——更长的窗口以 `too-large` 失败而不是被截短，不是整数或越界的 offset / length 则是 `gateway/bad-request`。窗口以 `Uint8Array` 类型的 `data` 返回，到文件末尾时短于 `length`，位于或越过末尾时为空；窗口含文件最后一个字节时 `eof` 为 true。不做任何解码，也不按二进制拒绝，因此图片或含 NUL 的文件在 `read` 以 `not-text` 失败之处仍可读出。与页一样附带同一 `version` 与 `bytes`。
 
 必填的选项对象传 `{}` 时，在 `maxFileBytes` 上限内读取完整文件；传 `{ range: {} }` 时，在 `maxBytes` 上限内读取默认字节窗口。超大完整文件失败，不截断。`baseFile` 与 `range` 可以组合，窗口始终不受完整文件上限约束。二进制 Remote 使用 Connection 的 multipart 响应传递 JSON 元数据与原始字节；生成的 Client 直接返回 `Uint8Array<ArrayBuffer>`，无需 base64 解码。调用方取消会传到文件系统。端点返回数据，不提供可导航的文档。
+
+### 可编辑文档
+
+`readDocument(path)` 返回完整 UTF-8 文本，以及和 `stat` 相同的版本与字节身份；超过 `maxFileBytes` 或后端判定非文本时拒绝。`writeDocument(path, text, expectedVersion)` 替换该文档，以 Session 工作区根作为 `workspace-write` 围栏，并返回新版本。带上加载时的版本可防止外部修改被静默覆盖；版本不匹配返回 `workspace-file/stale-version`。编辑器接受绝对路径或工作区相对路径；工作区外的写入会被围栏拒绝。
 
 ### 文件读取与目录检查
 
@@ -98,7 +104,7 @@ kind: "package-reference"
 
 ### 失败
 
-每种失败都是一个带类型化 details 的 `RemoteError` 代码，声明于 [`src/types.ts`](src/types.ts)：`workspace-file/not-found`、`workspace-file/outside-workspace`（目录列举或监听）、`workspace-file/watch-unsupported`（监听初始化失败）、`workspace-file/too-large`（带 `limit`，即适用的页、窗口或完整文件上限）、`workspace-file/not-text`、`workspace-file/not-regular-file`（`kind` 为 `directory`、`symlink` 或 `other`）`workspace-file/not-directory`（`kind` 为 `file`、`symlink` 或 `other`），以及 Git 命名空间的 `git-panel/not-a-repository`、`git-panel/bad-request`、`git-panel/no-workspace`、`git-panel/timeout`、`git-panel/command-failed`。调用方按代码分支，绝不按消息文本。
+每种失败都是一个带类型化 details 的 `RemoteError` 代码，声明于 [`src/types.ts`](src/types.ts)：`workspace-file/not-found`、`workspace-file/outside-workspace`（目录列举或监听）、`workspace-file/watch-unsupported`（监听初始化失败）、`workspace-file/too-large`（带 `limit`，即适用的页、窗口或完整文件上限）、`workspace-file/not-text`、`workspace-file/not-regular-file`（`kind` 为 `directory`、`symlink` 或 `other`）`workspace-file/not-directory`（`kind` 为 `file`、`symlink` 或 `other`）、`workspace-file/stale-version`（保存时的期望版本已不匹配），以及 Git 命名空间的 `git-panel/not-a-repository`、`git-panel/bad-request`、`git-panel/no-workspace`、`git-panel/timeout`、`git-panel/command-failed`。调用方按代码分支，绝不按消息文本。
 
 ### Client 文件资源
 

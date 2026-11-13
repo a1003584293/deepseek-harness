@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use this package to preview files readable through a Session's filesystem from the web client. It reads UTF-8 text by page, reads bounded byte windows or complete files, resolves related files from a base file's directory, and reports file metadata. Follow changes to a file or a directory's direct entries. Search the workspace for entries by name or relative path. File reads and watches may target paths outside the workspace; directory listing, search, and directory watches remain workspace-scoped. The same package mounts the `gitPanel` namespace for the desktop source-control tab: repository status, one file's unified diff, and index stage/unstage operations. The file-read surface exposes no mutation; only the Git namespace changes the index.
+Use this package to preview files readable through a Session's filesystem from the web client. It reads UTF-8 text by page, reads bounded byte windows or complete files, resolves related files from a base file's directory, and reports file metadata. Follow changes to a file or a directory's direct entries. Search the workspace for entries by name or relative path. File reads and watches may target paths outside the workspace; directory listing, search, and directory watches remain workspace-scoped. The same package mounts the `gitPanel` namespace for the desktop source-control tab: repository status, one file's unified diff, and index stage/unstage operations. Text previews remain read-only; `readDocument` and `writeDocument` add one whole-document editor path, and only the editor and the Git namespace can mutate disk state.
 
 ## Table of Contents
 
@@ -32,6 +32,8 @@ Mount the package beside `dsh-fs`, `dsh-sandbox-policy`, the Session store, and 
 | `stat(path)` | `WorkspaceFileStat { absolutePath, version, bytes? }` | Identity, version, and size of one regular file, without content |
 | `read(path, { offset?, limit? })` | `WorkspaceFileText` = stat + `{ offset, text, lines, eof }` | One window of lines from a UTF-8 text file; `lines` counts them, so one empty line and a page past the end read differently |
 | `readBytes(path, { range?, baseFile? })` | `WorkspaceFileBytes` = stat + `{ offset, data, eof }` | Complete file or bounded byte range as `Uint8Array`; optionally resolve from another file's directory |
+| `readDocument(path)` | `WorkspaceFileDocument` = stat + `{ text }` | The complete UTF-8 document for the Monaco editor, under the editor byte cap |
+| `writeDocument(path, text, expectedVersion)` | `WorkspaceFileWrite { absolutePath, version, operation }` | Replace the complete document under the Session workspace-write fence; a stale version is a conflict |
 | `list(path)` | `WorkspaceDirectoryListing { path, entries, truncated }` | Direct children of one directory |
 | `search({ query, excludedPaths, includeHidden, respectGitignore })` | `WorkspaceFileSearchResult { matches, truncated, incomplete }` | Entries anywhere in the workspace whose name or relative path contains the query |
 | `changes(path)` | stream of `WorkspaceFileWatchFrame` | Subscription readiness, then invalidations of one file or a directory's direct entries |
@@ -49,6 +51,10 @@ Mount the package beside `dsh-fs`, `dsh-sandbox-policy`, the Session store, and 
 `read` pages by lines and never by bytes; a byte window is `readBytes(path, { range: { offset?, length? } })`. `options.range.offset` is the 0-based first byte and defaults to 0; `options.range.length` is the largest number of bytes in the window and defaults to `maxBytes`, which it may not exceed — a longer window fails with `too-large` instead of arriving shortened, and an offset or length that is not an integer in range is a `gateway/bad-request`. The window comes back as `Uint8Array` data, shorter than `length` at the end of the file and empty at or past it; `eof` is true when the window includes the file's last byte. Nothing is decoded and nothing is refused as binary, so an image or a NUL-laden file reads where `read` fails with `not-text`. The same `version` and `bytes` ride along as on a page.
 
 Pass the required options object as `{}` for a complete file under `maxFileBytes`, or `{ range: {} }` for the default byte window under `maxBytes`. Oversized complete files fail rather than arriving truncated. `baseFile` and `range` can be combined, and windows remain independent of the complete-file cap. The binary Remote uses Connection's multipart response with JSON metadata and raw bytes; the generated Client returns `Uint8Array<ArrayBuffer>` without base64 decoding. Caller cancellation reaches the filesystem. The endpoint returns data, not a navigable document.
+
+### Editable documents
+
+`readDocument(path)` returns the complete UTF-8 text and the same version/byte identity as `stat`, refusing a document over `maxFileBytes` or one the backend rejects as non-text. `writeDocument(path, text, expectedVersion)` replaces that document, passes the Session workspace root as the `workspace-write` fence, and returns the new version. Supplying the loaded version guards against an external edit: a mismatch is `workspace-file/stale-version`, never a silent overwrite. The editor opens the file's absolute or workspace-relative path; writes outside the Session workspace are refused by the fence.
 
 ### File-read and directory checks
 
@@ -98,7 +104,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Failures
 
-Each failure is one `RemoteError` code with typed details, declared in [`src/types.ts`](src/types.ts): `workspace-file/not-found`, `workspace-file/outside-workspace` (directory listing or watching), `workspace-file/watch-unsupported` (watch initialization failed), `workspace-file/too-large` (with `limit`, the applicable page, window, or complete-file cap), `workspace-file/not-text`, `workspace-file/not-regular-file` (`kind`: `directory`, `symlink`, or `other`), `workspace-file/not-directory` (`kind`: `file`, `symlink`, or `other`), and the Git namespace's `git-panel/not-a-repository`, `git-panel/bad-request`, `git-panel/no-workspace`, `git-panel/timeout`, and `git-panel/command-failed`. Callers branch on the code, never on message text.
+Each failure is one `RemoteError` code with typed details, declared in [`src/types.ts`](src/types.ts): `workspace-file/not-found`, `workspace-file/outside-workspace` (directory listing or watching), `workspace-file/watch-unsupported` (watch initialization failed), `workspace-file/too-large` (with `limit`, the applicable page, window, or complete-file cap), `workspace-file/not-text`, `workspace-file/not-regular-file` (`kind`: `directory`, `symlink`, or `other`), `workspace-file/not-directory` (`kind`: `file`, `symlink`, or `other`), `workspace-file/stale-version` (a save's expected version no longer matched), and the Git namespace's `git-panel/not-a-repository`, `git-panel/bad-request`, `git-panel/no-workspace`, `git-panel/timeout`, and `git-panel/command-failed`. Callers branch on the code, never on message text.
 
 ### Client file resources
 

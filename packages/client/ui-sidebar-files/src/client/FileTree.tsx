@@ -97,6 +97,11 @@ export interface FileTreeInput {
    */
   readonly onOpen: (entry: TreeEntry) => void
   /**
+   * A file row was double-clicked to edit it.
+   * @param entry - the caller's entry.
+   */
+  readonly onEdit?: ((entry: TreeEntry) => void) | undefined
+  /**
    * Whether a file opens; a file it refuses is dimmed and titled with the localized no-viewer message. Every file opens without it.
    * @param entry - the caller's entry.
    * @returns `false` to refuse it.
@@ -246,7 +251,8 @@ function Entry({ node, tree }: { node: TreeNode; tree: TreeContext }): ReactNode
           <button type="button" className={clsx(css.action, hidden)} aria-current={current || undefined}
             ref={current ? input.currentRef : undefined}
             {...input.rowTriggerProps?.(entry, 'file')}
-            onClick={() => { input.onOpen(entry) }}>
+            onClick={() => { input.onOpen(entry) }}
+            onDoubleClick={() => { input.onEdit?.(entry) }}>
             <FileTypeIcon kind={classifyFileType(entry.name)} size={16} className={css.fileIcon} />
             {label}
           </button>

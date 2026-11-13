@@ -1,15 +1,21 @@
 /** Sidebar terminal screen and connection recovery. */
-import { useEffect, useLayoutEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import {
+  useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore,
+  type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
+} from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { Button, IconPlusOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalViewState, TerminalView } from '@deepseek-ai/dsh-api-terminal-controller/client'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { TerminalBodyInjected } from './face.ts'
 import type {} from './locales.ts'
 import '@xterm/xterm/css/xterm.css'
 import css from './terminal.module.css'
+import bottomCss from './bottom-terminal.module.css'
 import { TerminalTheme } from './terminal-theme.ts'
 import { observeTerminalCursor } from './terminal-cursor.ts'
 
@@ -84,7 +90,7 @@ const INPUT_GESTURES = ['keydown', 'beforeinput', 'paste', 'compositionend', 'dr
 const FOCUS_REPORTS = new Set(['\x1b[I', '\x1b[O'])
 
 /* oxlint-disable typescript/no-non-null-assertion -- React sets the DOM ref, then these effects initialize and use the emulator. */
-function TerminalScreen({ state, model, tabKey, visible, label, theme, cwd, openSelectionMenu, registerSelectionReader }: {
+export function TerminalScreen({ state, model, tabKey, visible, label, theme, cwd, openSelectionMenu, registerSelectionReader }: {
   state: TerminalViewState
   model: TerminalView
   tabKey: string
@@ -219,4 +225,142 @@ function fitScreen(xterm: Terminal, fit: FitAddon, state: TerminalViewState, mod
   if (cols < 2 || rows < 1) return
   xterm.resize(cols, rows)
   model.resize(cols, rows)
+}
+/** One terminal tab in the bottom dock. */
+interface BottomTab {
+  readonly key: string
+  readonly contentId: string
+  readonly title: string
+}
+
+/** Services and observable state the bottom dock needs. */
+export interface BottomTerminalInjected {
+  readonly hooks: {
+    readonly activeSession: HostObservable<SessionId | undefined>
+    readonly theme: HostObservable<ThemeSnapshot>
+    readonly open: HostObservable<boolean>
+    readonly height: HostObservable<number>
+  }
+  readonly view: (sessionId: SessionId, key: string, contentId: string) => TerminalView
+  readonly closeView: (sessionId: SessionId, key: string, contentId: string, id?: WebTerminalId) => void
+  readonly setHeight: (height: number) => void
+}
+
+/** Root slot props plus the bottom dock services and copy. */
+export type BottomTerminalProps = PropsRuntime<'shell.bottom'> & PropsLocale<'sidebarTerminal'> & InjectFace<BottomTerminalInjected>
+
+/** Subscribe one terminal model, tolerating the moment before a tab exists. */
+function useTerminalState(model: TerminalView | undefined): TerminalViewState | undefined {
+  const subscribe = useCallback((listener: () => void) => model?.state.subscribe(listener) ?? (() => {}), [model])
+  return useSyncExternalStore(subscribe, () => model?.state.getSnapshot(), () => model?.state.getSnapshot())
+}
+
+/** Content identity for one bottom tab; stable across remounts. */
+function contentIdOf(sessionId: SessionId, key: string): string {
+  return 'dsh-bottom-terminal:' + sessionId + ':' + key
+}
+
+/**
+ * Render the bottom terminal dock.
+ * @param props - the active Session, theme, open/height stores, and terminal model access.
+ * @returns the panel, or nothing while it is closed or has no Session.
+ */
+export function BottomTerminal({
+  useActiveSession, useTheme, useOpen, useHeight, view, closeView, setHeight, t,
+}: BottomTerminalProps): ReactNode {
+  const sessionId = useActiveSession(value => value)
+  const theme = useTheme(value => value)
+  const open = useOpen(value => value)
+  const height = useHeight(value => value)
+  const [tabs, setTabs] = useState<readonly BottomTab[]>([])
+  const [activeKey, setActiveKey] = useState<string>()
+  const next = useRef(1)
+  const active = tabs.find(tab => tab.key === activeKey) ?? tabs[0]
+  const model = sessionId === undefined || active === undefined ? undefined : view(sessionId, active.key, active.contentId)
+  const state = useTerminalState(model)
+
+  useEffect(() => {
+    if (sessionId === undefined) {
+      setTabs([])
+      setActiveKey(undefined)
+      return
+    }
+    const key = 'bottom-1'
+    setTabs([{ key, contentId: contentIdOf(sessionId, key), title: 'zsh' }])
+    setActiveKey(key)
+    next.current = 2
+  }, [sessionId])
+
+  useEffect(() => {
+    if (model === undefined) return
+    return model.mount()
+  }, [model])
+
+  if (!open || sessionId === undefined) return null
+
+  const add = (): void => {
+    const key = 'bottom-' + String(next.current)
+    next.current += 1
+    setTabs(current => [...current, { key, contentId: contentIdOf(sessionId, key), title: 'zsh' }])
+    setActiveKey(key)
+  }
+
+  const close = (tab: BottomTab): void => {
+    const current = view(sessionId, tab.key, tab.contentId)
+    closeView(sessionId, tab.key, tab.contentId, current.id)
+    setTabs((list) => {
+      const remaining = list.filter(item => item.key !== tab.key)
+      if (remaining.length === 0) return [{ key: 'bottom-1', contentId: contentIdOf(sessionId, 'bottom-1'), title: 'zsh' }]
+      return remaining
+    })
+    if (activeKey === tab.key) setActiveKey(tabs.find(item => item.key !== tab.key)?.key)
+  }
+
+  const clear = (): void => { model?.write('\x0c') }
+
+  const resize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const startY = event.clientY
+    const startHeight = height
+    const move = (moveEvent: PointerEvent): void => {
+      const nextHeight = Math.min(Math.max(startHeight + (startY - moveEvent.clientY), 120), Math.floor(window.innerHeight * 0.7))
+      setHeight(nextHeight)
+    }
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  return (
+    <section className={bottomCss.panel} style={{ height }} data-bottom-terminal>
+      <div className={bottomCss.handle} role="separator" aria-orientation="horizontal" onPointerDown={resize} />
+      <div className={bottomCss.tabs}>
+        {tabs.map(tab => (
+          <div key={tab.key} className={bottomCss.tab} data-active={tab.key === active?.key || undefined}>
+            <button type="button" className={bottomCss.tabButton} onClick={() => { setActiveKey(tab.key) }}>
+              <span className={bottomCss.prompt}>&gt;_</span>{tab.title}
+            </button>
+            <button type="button" className={bottomCss.closeTab} aria-label={t('close')} title={t('close')}
+              onClick={() => { close(tab) }}>×</button>
+          </div>
+        ))}
+        <button type="button" className={bottomCss.add} aria-label={t('new')} title={t('new')} onClick={add}>+</button>
+      </div>
+      <div className={bottomCss.body} onKeyDownCapture={(event) => {
+        if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'l')) {
+          event.preventDefault()
+          event.stopPropagation()
+          clear()
+        }
+      }}>
+        {state === undefined || model === undefined || active === undefined
+          ? <p className={bottomCss.note}>{t('loading')}</p>
+          : <TerminalScreen state={state} model={model} tabKey={active.key} visible label={t('title')} theme={theme}
+            cwd={state.environment?.cwd} openSelectionMenu={() => {}} registerSelectionReader={() => () => {}} />}
+      </div>
+    </section>
+  )
 }

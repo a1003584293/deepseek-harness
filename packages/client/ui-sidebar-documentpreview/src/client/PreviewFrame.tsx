@@ -17,6 +17,13 @@ import type { ContextMenuTriggerProps } from '@deepseek-ai/dsh-client-ui-context
 import { PathLabel } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './TextPreview.module.css'
 
+declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
+  interface SidebarRightTabParamsMap {
+    /** The editable file page owned by ui-sidebar-files. */
+    'file-editor': { readonly path: string }
+  }
+}
+
 /** The inputs both navigator Factory positions render from. */
 type NavigatorSeatProps = Pick<PropsRuntime<'sidebar.right.pane.tab'>, 'useTabInfo'> & PropsRenderFactories
 
@@ -29,7 +36,10 @@ const NavigatorSeat = memo(function NavigatorSeat({ useTabInfo, renderFactorySlo
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
   }, [tab.actions, panel.id, panel.isFloating])
-  return renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: false, onOpen })
+  const onEdit = useCallback((address: string): void => {
+    tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+  }, [tab.actions, panel.id, panel.isFloating])
+  return renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: false, onOpen, onEdit })
 })
 
 /** The navigator's toggle at the header's end. */
