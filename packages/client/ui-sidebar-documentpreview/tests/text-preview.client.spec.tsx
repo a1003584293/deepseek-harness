@@ -912,8 +912,9 @@ describe('TextPreview — workspace navigator Factories', () => {
     const props = h.props()
     const info = props.useTabInfo()
     const openResource = vi.fn()
+    const openTab = vi.fn()
     const useTabInfo: TextPreviewProps['useTabInfo'] = () => ({
-      ...info, panel: { ...info.panel, isFloating }, tab: { ...info.tab, actions: { ...info.tab.actions, openResource } },
+      ...info, panel: { ...info.panel, isFloating }, tab: { ...info.tab, actions: { ...info.tab.actions, openResource, openTab } },
     })
     let open: ((address: string) => void) | undefined
     const renderFactorySlot: TextPreviewProps['renderFactorySlot'] = (name, input) => {
@@ -923,10 +924,12 @@ describe('TextPreview — workspace navigator Factories', () => {
     render(<TextPreview {...props} useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />)
     await settle()
     expect(open).toBeTypeOf('function')
-    open!('dsh-resource://file/session/s-1/b.txt')
-    // A tree pick is new content: it lands beside the preview, never on top of it.
-    if (isFloating) expect(openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/s-1/b.txt')
-    else expect(openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/s-1/b.txt', { paneId: info.panel.id })
+    const address = 'dsh-resource://file/session/s-1/b.txt'
+    open!(address)
+    // A text tree pick opens the editor beside the preview, never on top of it.
+    if (isFloating) expect(openTab).toHaveBeenCalledExactlyOnceWith('file-editor', { params: { path: address } })
+    else expect(openTab).toHaveBeenCalledExactlyOnceWith('file-editor', { params: { path: address }, paneId: info.panel.id })
+    expect(openResource).not.toHaveBeenCalled()
   })
 
   it('starts a text preview without a notice with its header', async () => {

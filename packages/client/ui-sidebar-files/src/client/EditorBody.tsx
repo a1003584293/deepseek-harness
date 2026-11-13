@@ -14,7 +14,7 @@ import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sideb
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { FileTypeIcon, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
-import { monaco } from './monaco-api.ts'
+import { loadMonacoLanguage, monaco } from './monaco-api.ts'
 import type { MonacoEditor } from './monaco-api.ts'
 import css from './EditorBody.module.css'
 import type {} from './locales.ts'
@@ -87,6 +87,31 @@ export function EditorTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab
   )
 }
 
+/** Languages registered by the shell's selective Monaco vendor, in picker order. */
+const EDITOR_LANGUAGES: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'plaintext', label: 'Plain Text' },
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'json', label: 'JSON' },
+  { id: 'yaml', label: 'YAML' },
+  { id: 'javascript', label: 'JavaScript' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'python', label: 'Python' },
+  { id: 'shell', label: 'Shell' },
+  { id: 'html', label: 'HTML' },
+  { id: 'css', label: 'CSS' },
+  { id: 'sql', label: 'SQL' },
+  { id: 'go', label: 'Go' },
+  { id: 'rust', label: 'Rust' },
+  { id: 'java', label: 'Java' },
+  { id: 'cpp', label: 'C / C++' },
+  { id: 'csharp', label: 'C#' },
+  { id: 'php', label: 'PHP' },
+  { id: 'ruby', label: 'Ruby' },
+  { id: 'xml', label: 'XML' },
+  { id: 'ini', label: 'INI / TOML' },
+  { id: 'dockerfile', label: 'Dockerfile' },
+]
+
 /** Monaco language id from the file extension. */
 function languageOf(path: string): string {
   const extension = path.split('.').pop()?.toLowerCase() ?? ''
@@ -119,6 +144,7 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
   const path = parseFileAddress(address)?.path ?? address
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
+  const [language, setLanguage] = useState(() => languageOf(path))
   const [error, setError] = useState<string>()
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -137,6 +163,8 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
   const rememberRef = useRef(rememberPath)
   rememberRef.current = rememberPath
   const saveRef = useRef<() => void>(() => {})
+
+  useEffect(() => { setLanguage(languageOf(path)) }, [path])
 
   useEffect(() => {
     if (address === '') {
@@ -201,26 +229,24 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
 
   useEffect(() => {
     const api = monaco()
+    const editor = editorRef.current
+    const model = editor?.getModel()
+    if (api === undefined || model === undefined || model === null) return
+    let cancelled = false
+    void loadMonacoLanguage(language).then(() => {
+      if (!cancelled && editorRef.current === editor) api.editor.setModelLanguage(model, language)
+    })
+    return () => { cancelled = true }
+  }, [language])
+
+  useEffect(() => {
+    const api = monaco()
     const host = hostRef.current
     if (api === undefined || host === null || document === undefined) return
-    const model = api.editor.createModel(document.text, languageOf(path))
-    const editor = api.editor.create(host, {
-      model,
-      automaticLayout: true,
-      readOnly: false,
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      fontSize: 12,
-      tabSize: 2,
-      theme: darkTheme() ? 'vs-dark' : 'vs',
-    })
-    editorRef.current = editor
-    const change = editor.onDidChangeModelContent(() => {
-      const value = editor.getValue()
-      setText(value)
-      setDirty(value !== savedText.current)
-    })
-    editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.KeyS, () => { saveRef.current() })
+    let cancelled = false
+    let model: ReturnType<typeof api.editor.createModel> | undefined
+    let editor: ReturnType<typeof api.editor.create> | undefined
+    let change: { dispose(): void } | undefined
     const keydown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault()
@@ -228,11 +254,37 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
       }
     }
     host.addEventListener('keydown', keydown, true)
+    const initialLanguage = languageOf(path)
+    void loadMonacoLanguage(initialLanguage).then(() => {
+      if (cancelled) return
+      model = api.editor.createModel(document.text, initialLanguage)
+      const created = api.editor.create(host, {
+        model,
+        automaticLayout: true,
+        readOnly: false,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        fontSize: 12,
+        tabSize: 2,
+        theme: darkTheme() ? 'vs-dark' : 'vs',
+      })
+      editor = created
+      editorRef.current = created
+      change = created.onDidChangeModelContent(() => {
+        const value = created.getValue()
+        setText(value)
+        setDirty(value !== savedText.current)
+      })
+      created.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.KeyS, () => { saveRef.current() })
+    }).catch((cause: unknown) => {
+      if (!cancelled) setError(tRef.current('editor.readFailed', { message: cause instanceof Error ? cause.message : String(cause) }))
+    })
     return () => {
+      cancelled = true
       host.removeEventListener('keydown', keydown, true)
-      change.dispose()
-      editor.dispose()
-      model.dispose()
+      change?.dispose()
+      editor?.dispose()
+      model?.dispose()
       editorRef.current = undefined
     }
   }, [document, path])
@@ -278,6 +330,12 @@ export function EditorBody({ useTabInfo, readDocument, writeDocument, pathFor, r
           setDirty(event.target.value !== savedText.current)
         }} />
         : <div ref={hostRef} className={css.host} data-monaco-editor />}
+      <footer className={css.footer}>
+        <select className={css.language} value={language} aria-label={t('editor.language')}
+          onChange={(event) => { setLanguage(event.target.value) }}>
+          {EDITOR_LANGUAGES.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select>
+      </footer>
     </div>
   )
 }

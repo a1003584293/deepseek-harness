@@ -17,6 +17,7 @@ import {
   IconPauseOutlineRegular, IconPlayOutlineRegular, IconRefreshOutlineRegular, IconSearchOutlineRegular, PathLabel, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FilesInjected } from './face.ts'
+import { isEditableFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { EDITOR_KIND } from './EditorBody.tsx'
 import type {} from './FileNavigator.tsx'
 import type {} from './locales.ts'
@@ -45,6 +46,12 @@ export function FilesBody(props: FilesBodyProps): ReactNode {
   const { tab, panel } = useTabInfo()
   const { getTriggerProps } = useContextMenu()
   const onOpen = useCallback((address: string): void => {
+    // Text-like files open directly in the editor; media and documents keep
+    // their preview viewer.
+    if (isEditableFileAddress(address)) {
+      tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+      return
+    }
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
   }, [tab.actions, panel.id, panel.isFloating])

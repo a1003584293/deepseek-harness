@@ -307,8 +307,10 @@ describe('FilesBody', () => {
     fireEvent.click(within(view.container.querySelector<HTMLElement>(`[data-files-path="${ROOT}/README.md"]`)!).getByRole('button', { name: 'README.md' }))
     // Every row sits under the tree's root, so the address is the path relative to it.
     const address = fileAddressFor(SESSION, ROOT, `${ROOT}/README.md`)
-    if (isFloating) expect(tabActions.openResource).toHaveBeenCalledExactlyOnceWith(address)
-    else expect(tabActions.openResource).toHaveBeenCalledExactlyOnceWith(address, { paneId: PANE })
+    // Text-like files bypass the preview and open in the editor.
+    if (isFloating) expect(tabActions.openTab).toHaveBeenCalledExactlyOnceWith('file-editor', { params: { path: address } })
+    else expect(tabActions.openTab).toHaveBeenCalledExactlyOnceWith('file-editor', { params: { path: address }, paneId: PANE })
+    expect(tabActions.openResource).not.toHaveBeenCalled()
     // The tree keeps the default shown choice for the pane, where the file it appends draws.
     expect(instance.getSnapshot().byPane[PANE]?.open).toBe(true)
     expect(view.container.querySelector('[data-files-navigator]')).not.toBeNull()

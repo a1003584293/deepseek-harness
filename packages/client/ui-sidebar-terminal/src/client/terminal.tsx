@@ -257,8 +257,14 @@ function useTerminalState(model: TerminalView | undefined): TerminalViewState | 
 }
 
 /** Content identity for one bottom tab; stable across remounts. */
+let bottomSequence = 0
+
 function contentIdOf(sessionId: SessionId, key: string): string {
-  return 'dsh-bottom-terminal:' + sessionId + ':' + key
+  // The bottom tab set is not persisted, so its content identity must not be
+  // either: a deterministic id would recover a prior window's terminal id from
+  // the binding store and land on missingTerminal after a restart.
+  bottomSequence += 1
+  return 'dsh-bottom-terminal:' + sessionId + ':' + key + ':' + String(bottomSequence) + ':' + Date.now().toString(36)
 }
 
 /**
@@ -375,8 +381,11 @@ export function BottomTerminal({
         {state === undefined || model === undefined || active === undefined
           ? <p className={bottomCss.note}>{t('loading')}</p>
           : state.info === undefined
-            ? <p className={bottomCss.note}>{state.issue ?? state.error
-              ?? (state.phase === 'creating' ? t('creating') : state.phase === 'connecting' ? t('connecting') : t('loading'))}</p>
+            ? <div className={bottomCss.note}>
+              <span>{state.issue ?? state.error
+                ?? (state.phase === 'creating' ? t('creating') : state.phase === 'connecting' ? t('connecting') : t('loading'))}</span>
+              {state.issue === 'missingTerminal' ? <button type="button" className={bottomCss.add} onClick={add}>{t('new')}</button> : null}
+            </div>
             : <TerminalScreen state={state} model={model} tabKey={active.key} visible label={t('title')} theme={theme}
               cwd={state.environment?.cwd} openSelectionMenu={() => {}} registerSelectionReader={() => () => {}} />}
       </div>

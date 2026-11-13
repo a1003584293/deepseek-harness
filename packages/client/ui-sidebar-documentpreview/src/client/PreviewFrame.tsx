@@ -13,6 +13,7 @@ import { memo, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-files/client'
+import { isEditableFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ContextMenuTriggerProps } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { PathLabel } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './TextPreview.module.css'
@@ -33,6 +34,10 @@ const NavigatorSeat = memo(function NavigatorSeat({ useTabInfo, renderFactorySlo
   const onOpen = useCallback((address: string): void => {
     // A file picked in the workspace tree is independent content: open it as a
     // new tab in this pane instead of replacing the preview that shows the tree.
+    if (isEditableFileAddress(address)) {
+      tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+      return
+    }
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
   }, [tab.actions, panel.id, panel.isFloating])

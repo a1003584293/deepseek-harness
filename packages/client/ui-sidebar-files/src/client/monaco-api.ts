@@ -36,14 +36,26 @@ export interface MonacoApi {
     create(container: HTMLElement, options: Record<string, unknown>): MonacoEditor
     createModel(value: string, language?: string): MonacoModel
     createDiffEditor(container: HTMLElement, options: Record<string, unknown>): MonacoDiffEditor
+    setModelLanguage(model: MonacoModel, language: string): void
   }
   KeyMod: { CtrlCmd: number }
   KeyCode: { KeyS: number }
 }
 
-type MonacoScope = typeof globalThis & { __DSH_MONACO__?: MonacoApi }
+type MonacoScope = typeof globalThis & {
+  __DSH_MONACO__?: MonacoApi
+  __DSH_LOAD_MONACO_LANGUAGE__?: (language: string) => Promise<void>
+}
 
 /** @returns the shell-mounted Monaco, or undefined when the shell has no vendor. */
 export function monaco(): MonacoApi | undefined {
   return (globalThis as MonacoScope).__DSH_MONACO__
+}
+
+/**
+ * Load one language tokenizer/service on demand.
+ * @param language - Monaco language id.
+ */
+export async function loadMonacoLanguage(language: string): Promise<void> {
+  await (globalThis as MonacoScope).__DSH_LOAD_MONACO_LANGUAGE__?.(language)
 }
