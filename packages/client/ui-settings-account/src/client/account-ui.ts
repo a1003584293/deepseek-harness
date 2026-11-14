@@ -13,6 +13,11 @@ export interface AccountUi {
    * @returns the latest account state.
    */
   getSnapshot(): AccountUiState
+  /** Subscribe to account snapshot changes, including profile and balance reads.
+   * @param listener - called after the snapshot is replaced.
+   * @returns unsubscribe.
+   */
+  subscribe(listener: () => void): () => void
   /** Build metadata for one account request.
    * @param locale - requested language.
    * @returns this client's version, language, and timezone.

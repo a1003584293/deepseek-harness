@@ -87,6 +87,22 @@ export function apply(ctx: ClientContext): void {
   // Restored page tabs lose navigation params but keep their content identity;
   // remember the address per content so the editor can reload its file.
   const editorPaths = createSnapshotStore<Record<string, string>>({}, { persist: { name: 'sidebarEditorPaths' } })
+  const accountName = createSnapshotStore<string | undefined>(undefined)
+  // The account plugin owns profile reads; mirror only its display name for
+  // the editor status line, including profile after view, balance, and avatar updates.
+  ctx.inject(['accountUi'], (accountCtx) => {
+    type AccountState = { details?: { profile?: { status?: string; value?: { name?: string } } } }
+    const account = accountCtx.get('accountUi') as unknown as {
+      getSnapshot(): AccountState
+      subscribe(listener: () => void): () => void
+    }
+    const sync = (): void => {
+      const profile = account.getSnapshot().details?.profile
+      accountName.set(profile?.status === 'ready' ? profile.value?.name : undefined)
+    }
+    sync()
+    accountCtx.effect(() => account.subscribe(sync), 'ui-sidebar-files: account name')
+  })
   const workspaceSearch = createSearch(ctx.remote)
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {
     const source = ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: tabId }).navigation
@@ -274,6 +290,17 @@ export function apply(ctx: ClientContext): void {
       } | undefined
       sidebar?.clearPageFile(sessionId, contentId, address)
     },
+    readBranch: async (signal) => {
+      const panel = Reflect.get(ctx.remote, 'gitPanel') as typeof ctx.remote.gitPanel | undefined
+      if (panel === undefined) return null
+      try {
+        const result = await panel.status(sessionId, signal)
+        return result.ok ? result.value.branch : null
+      } catch {
+        return null
+      }
+    },
+    hooks: { accountName },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')

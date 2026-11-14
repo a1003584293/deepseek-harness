@@ -62,7 +62,14 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
-  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client })
+  ctx.provide('accountUi', {
+    getSnapshot: () => snapshot,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    clientMetadata: client,
+  })
   let revision = 0
   let refreshing: Promise<void> | undefined
   const refresh = (): Promise<void> => {

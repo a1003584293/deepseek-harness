@@ -11,8 +11,9 @@ import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceFileDocument, WorkspaceFileWrite } from '@deepseek-ai/dsh-api-workspace-files'
 import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SidebarRightTabDefinition, SidebarTextSelection } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { FileTypeIcon, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FileTypeIcon, IconBranchOutlineRegular, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isEditableFileAddress, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { loadMonacoLanguage, monaco } from './monaco-api.ts'
 import type { MonacoEditor } from './monaco-api.ts'
@@ -66,6 +67,10 @@ export interface EditorInjected {
   readonly publishFile: (contentId: string, address: string) => void
   /** Drop that registration when this body unmounts. */
   readonly clearFile: (contentId: string, address: string) => void
+  /** Read the workspace checkout's current branch for the status line. */
+  readonly readBranch: (signal: AbortSignal) => Promise<string | null>
+  /** Live account display name for the status line. */
+  readonly hooks: { readonly accountName: ObservableSnapshot<string | undefined> }
 }
 
 /** The title's access to the address a restored page recovered. */
@@ -178,13 +183,17 @@ function darkTheme(): boolean {
  * @returns the editor header above the Monaco surface.
  */
 export function EditorBody({
-  sessionId, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
-  publishFile, clearFile, renderFactorySlot, t,
+  sessionId, useSessions, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
+  publishFile, clearFile, readBranch, useAccountName, renderFactorySlot, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
   const path = parseFileAddress(address)?.path ?? address
   const fileAddress = path === '' ? '' : address.startsWith('dsh-resource://file/') ? address : sessionFileAddress(sessionId, path)
+  const sessionTitle = useSessions(state => state.byId[sessionId]?.displayTitle)
+  const workspacePath = useSessions(state => state.byId[sessionId]?.cwd)
+  const accountName = useAccountName(value => value)
+  const [branch, setBranch] = useState<string>()
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
   const [language, setLanguage] = useState(() => languageOf(path))
@@ -210,8 +219,19 @@ export function EditorBody({
   const clearFileRef = useRef(clearFile)
   clearFileRef.current = clearFile
   const saveRef = useRef<() => void>(() => {})
+  const readBranchRef = useRef(readBranch)
+  readBranchRef.current = readBranch
 
   useEffect(() => { setLanguage(languageOf(path)) }, [path])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setBranch(undefined)
+    void readBranchRef.current(controller.signal).then((value) => {
+      if (!controller.signal.aborted) setBranch(value ?? undefined)
+    }).catch(() => { if (!controller.signal.aborted) setBranch(undefined) })
+    return () => { controller.abort() }
+  }, [sessionId])
 
   // Restored page tabs have no navigation params; register the address from
   // the persisted content identity so the title, tab menu, and composer chip
@@ -382,6 +402,7 @@ export function EditorBody({
   }
 
   const name = path.split(/[\\/]/).pop() ?? path
+  const workspaceName = workspacePath?.split(/[\\/]/).filter(Boolean).pop()
   return (
     <div className={css.page} data-file-editor>
       <div className={css.header}>
@@ -409,6 +430,17 @@ export function EditorBody({
         <EditorNavigator useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />
       </div>
       <footer className={css.footer}>
+        <div className={css.status} data-editor-status>
+          {branch === undefined ? null : <span className={css.statusItem} title={branch} data-editor-branch>
+            <IconBranchOutlineRegular size={12} />{branch}
+          </span>}
+          {sessionTitle === undefined ? null
+            : <span className={css.statusItem} title={sessionTitle} data-editor-session>{sessionTitle}</span>}
+          {workspaceName === undefined ? null
+            : <span className={css.statusItem} title={workspacePath} data-editor-workspace>{workspaceName}</span>}
+          {accountName === undefined ? null
+            : <span className={css.statusItem} title={accountName} data-editor-account>{accountName}</span>}
+        </div>
         <select className={css.language} value={language} aria-label={t('editor.language')}
           onChange={(event) => { setLanguage(event.target.value) }}>
           {EDITOR_LANGUAGES.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}

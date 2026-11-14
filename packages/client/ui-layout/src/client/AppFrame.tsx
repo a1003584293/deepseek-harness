@@ -142,6 +142,15 @@ export function AppFrame({
   t,
 }: AppFrameProps) {
   const layoutInfo = useStore(state => state.layoutInfo)
+  const defaultCollapsed = useRef(false)
+  // Desktop opens compact: the conversation and editor own the window, and the
+  // sidebar is one shortcut away. Web keeps its historical expanded default.
+  useLayoutEffect(() => {
+    if (defaultCollapsed.current) return
+    defaultCollapsed.current = true
+    if (!('dshDesktop' in globalThis) || layoutInfo.sidebar === 0) return
+    actions.toggleSidebar()
+  }, [actions, layoutInfo.sidebar])
   const editorSide = useEditorSide(side => side)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const viewport = layoutInfo.viewportWidth
