@@ -62,6 +62,15 @@ export interface EditorInjected {
   readonly reportSelection: (selection: SidebarTextSelection) => void
   /** Clear a selection that belongs to this editor. */
   readonly clearSelection: (selection: { readonly sessionId: SidebarTextSelection['sessionId']; readonly address: string }) => void
+  /** Register the recovered file address so the tab menu and composer can name it. */
+  readonly publishFile: (contentId: string, address: string) => void
+  /** Drop that registration when this body unmounts. */
+  readonly clearFile: (contentId: string, address: string) => void
+}
+
+/** The title's access to the address a restored page recovered. */
+export interface EditorTitleInjected {
+  readonly pathFor: (contentId: string) => string | undefined
 }
 
 /** Standard tab seat, namespace copy, and the complete-file operations. */
@@ -79,9 +88,9 @@ export function editorDefinition(t: TranslateNS<'sidebarFiles'>): SidebarRightTa
 }
 
 /** The tab title: the file's type glyph and basename. */
-export function EditorTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab.title'>): ReactNode {
+export function EditorTitle({ useTabInfo, pathFor }: PropsRuntime<'sidebar.right.pane.tab.title'> & InjectFace<EditorTitleInjected>): ReactNode {
   const { tab } = useTabInfo()
-  const address = tab.navigation.params?.path ?? ''
+  const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
   const name = (parseFileAddress(address)?.path ?? address).split(/[\\/]/).pop() ?? address
   return (
     <>
@@ -143,12 +152,13 @@ function darkTheme(): boolean {
  * @returns the editor header above the Monaco surface.
  */
 export function EditorBody({
-  sessionId, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection, t,
+  sessionId, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
+  publishFile, clearFile, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
   const path = parseFileAddress(address)?.path ?? address
-  const fileAddress = address.startsWith('dsh-resource://file/') ? address : sessionFileAddress(sessionId, path)
+  const fileAddress = path === '' ? '' : address.startsWith('dsh-resource://file/') ? address : sessionFileAddress(sessionId, path)
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
   const [language, setLanguage] = useState(() => languageOf(path))
@@ -169,9 +179,22 @@ export function EditorBody({
   tRef.current = t
   const rememberRef = useRef(rememberPath)
   rememberRef.current = rememberPath
+  const publishRef = useRef(publishFile)
+  publishRef.current = publishFile
+  const clearFileRef = useRef(clearFile)
+  clearFileRef.current = clearFile
   const saveRef = useRef<() => void>(() => {})
 
   useEffect(() => { setLanguage(languageOf(path)) }, [path])
+
+  // Restored page tabs have no navigation params; register the address from
+  // the persisted content identity so the title, tab menu, and composer chip
+  // can name this file again.
+  useEffect(() => {
+    if (fileAddress === '') return
+    publishRef.current(tab.contentId, fileAddress)
+    return () => { clearFileRef.current(tab.contentId, fileAddress) }
+  }, [fileAddress, tab.contentId])
 
   useEffect(() => {
     if (address === '') {
@@ -284,6 +307,7 @@ export function EditorBody({
         setDirty(value !== savedText.current)
       })
       const report = (): void => {
+        if (fileAddress === '') return
         const selection = created.getSelection()
         if (selection === null || (selection.startLineNumber === selection.endLineNumber
           && selection.startColumn === selection.endColumn)) {
@@ -308,7 +332,7 @@ export function EditorBody({
       change?.dispose()
       editor?.dispose()
       model?.dispose()
-      clearSelection({ sessionId, address: fileAddress })
+      if (fileAddress !== '') clearSelection({ sessionId, address: fileAddress })
       editorRef.current = undefined
     }
   }, [document, path])

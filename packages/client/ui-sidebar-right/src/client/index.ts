@@ -1,5 +1,4 @@
 import { IconCloseOutlineRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { fileLeafName, fileStem } from './file-name.ts'
 import { TabMenuContent } from './shell/TabMenuContent.tsx'
@@ -155,7 +154,7 @@ export function apply(ctx: ClientContext): void {
       const tabId = tab.id
       const tabs = controller.menuTabs(sessionId, paneId, tabId)
       if (!tabs.close && tabs.all.length === 0) return []
-      const file = parseFileAddress(tab.contentId)
+      const filePath = controller.filePathOf(tab.contentId)
       const closeMany = (ids: readonly TabId[]) => {
         for (const id of ids) {
           if (controller.menuTabs(sessionId, paneId, tabId).all.includes(id)) controller.closeIn(sessionId, id)
@@ -165,9 +164,9 @@ export function apply(ctx: ClientContext): void {
         { id: 'close', commandId: 'page.close' as ShortcutCommandId, icon: { key: 'sidebar.close' }, label: t('menu.close'), disabled: !tabs.close, run: () => { if (controller.menuTabs(sessionId, paneId, tabId).close) controller.closeIn(sessionId, tabId) } },
         { id: 'others', label: t('menu.closeOthers'), disabled: tabs.all.length === 0, run: () => { closeMany(tabs.all) } },
         ...tabs.right.length === 0 ? [] : [{ id: 'right', label: t('menu.closeRight'), run: () => { closeMany(tabs.right) } }],
-        ...file === undefined ? [] : [
-          { id: 'copyName', separatorBefore: true, label: t('menu.copyFileName'), run: () => { void copyFileName(file.path, false) } },
-          { id: 'copyNameWithExtension', label: t('menu.copyFileNameWithExtension'), run: () => { void copyFileName(file.path, true) } },
+        ...filePath === undefined ? [] : [
+          { id: 'copyName', separatorBefore: true, label: t('menu.copyFileName'), run: () => { void copyFileName(filePath, false) } },
+          { id: 'copyNameWithExtension', label: t('menu.copyFileNameWithExtension'), run: () => { void copyFileName(filePath, true) } },
         ],
       ]
     },

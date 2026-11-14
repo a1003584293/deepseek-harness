@@ -262,6 +262,18 @@ export function apply(ctx: ClientContext): void {
       } | undefined
       sidebar?.clearTextSelection(selection.sessionId, selection.address)
     },
+    publishFile: (contentId, address) => {
+      const sidebar = ctx.get('sidebarRight') as {
+        setPageFile(sessionId: unknown, contentId: string, address: string): void
+      } | undefined
+      sidebar?.setPageFile(sessionId, contentId, address)
+    },
+    clearFile: (contentId, address) => {
+      const sidebar = ctx.get('sidebarRight') as {
+        clearPageFile(sessionId: unknown, contentId: string, address: string): void
+      } | undefined
+      sidebar?.clearPageFile(sessionId, contentId, address)
+    },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')
@@ -270,7 +282,10 @@ export function apply(ctx: ClientContext): void {
     EditorBody,
   )), 'ui-sidebar-files: editor tab body')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
-    { name: 'sidebar.right.pane.tab.title', key: EDITOR_ID },
+    {
+      name: 'sidebar.right.pane.tab.title', key: EDITOR_ID,
+      inject: () => ({ pathFor: (contentId: string) => editorPaths.getSnapshot()[contentId] }),
+    },
     EditorTitle,
   )), 'ui-sidebar-files: editor tab title')
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({

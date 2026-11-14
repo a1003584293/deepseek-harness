@@ -342,6 +342,8 @@ export class SidebarRightController implements ISidebarRight {
     createSnapshotStore<SidebarActiveFile | undefined>(undefined)
   private readonly textSelection: SnapshotStore<SidebarTextSelection | undefined> =
     createSnapshotStore<SidebarTextSelection | undefined>(undefined)
+  /** Resource address of page tabs whose opener params were lost on restore. */
+  private readonly pageFiles = new Map<string, string>()
   private readonly adopted: ReadonlyMap<SessionId, Adoption>
   private readonly rooms: ReadonlyMap<SessionId, RoomRule>
   private readonly closeHandlers = new Map<string, SidebarRightCloseHandler>()
@@ -418,6 +420,42 @@ export class SidebarRightController implements ISidebarRight {
    * layout commit and after a selection change.
    * @param sessionId - the adopted Session whose layout last committed.
    */
+  /**
+   * Remember the file a page tab recovered from its persisted content identity.
+   * @param sessionId - Session owning the page.
+   * @param contentId - stable tab content identity.
+   * @param address - file resource address.
+   */
+  setPageFile(sessionId: SessionId, contentId: string, address: string): void {
+    if (this.pageFiles.get(contentId) === address) return
+    this.pageFiles.set(contentId, address)
+    this.refreshActiveFile(sessionId)
+  }
+
+  /**
+   * Drop a page file registration when its body unmounts.
+   * @param sessionId - Session owning the page.
+   * @param contentId - stable tab content identity.
+   * @param address - address the body registered; a newer owner survives.
+   */
+  clearPageFile(sessionId: SessionId, contentId: string, address: string): void {
+    if (this.pageFiles.get(contentId) !== address) return
+    this.pageFiles.delete(contentId)
+    this.refreshActiveFile(sessionId)
+  }
+
+  /**
+   * The filesystem path a tab addresses, whether a resource tab or a page editor.
+   * @param contentId - tab content identity.
+   * @returns the path, or undefined for non-file tabs.
+   */
+  filePathOf(contentId: string): string | undefined {
+    const direct = parseFileAddress(contentId)
+    if (direct !== undefined) return direct.path
+    const address = this.pageFiles.get(contentId)
+    return address === undefined ? undefined : parseFileAddress(address)?.path
+  }
+
   refreshActiveFile(sessionId: SessionId): void {
     const layout = this.adopted.get(sessionId)?.store.getSnapshot().bySession[sessionId]?.layout
     const pane = layout === undefined ? undefined : layout.nodes[layout.activePaneId]
@@ -427,11 +465,14 @@ export class SidebarRightController implements ISidebarRight {
     const address = navigation?.address
     // A page tab (the file editor) carries its resource address in navigation
     // params, not in the page address; prefer that so the composer's active-file
-    // chip follows an editor tab too.
+    // chip follows an editor tab too. Restored tabs lose params, so the body
+    // registers the address it recovered from its persisted content identity.
     const params = navigation?.params as { readonly path?: unknown } | undefined
+    const contentId = tabId === undefined ? undefined : layout?.tabs[tabId]?.contentId
+    const pageAddress = contentId === undefined ? undefined : this.pageFiles.get(contentId)
     const candidate = address !== undefined && parseFileAddress(address) !== undefined
       ? address
-      : typeof params?.path === 'string' ? params.path : undefined
+      : typeof params?.path === 'string' ? params.path : pageAddress
     const parsed = candidate === undefined ? undefined : parseFileAddress(candidate)
     const selection = this.textSelection.getSnapshot()
     const range = parsed !== undefined && selection !== undefined

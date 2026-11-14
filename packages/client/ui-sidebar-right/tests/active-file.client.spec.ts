@@ -34,6 +34,20 @@ describe('active file', () => {
     expect(h.controller.activeFile.getSnapshot()).toMatchObject({ startLine: 3, endLine: 7 })
   })
 
+  it('recovers a restored page editor from its registered persisted path', () => {
+    const h = controllerHarness()
+    h.tabs.register({ id: 'test/editor-restored', kind: 'editor-restored', priority: 'builtin', title: () => 'Editor' })
+    h.publish()
+    h.controller.openTab('editor-restored' as never)
+    const layout = h.layout()
+    const tab = Object.values(layout.tabs)[0]!
+    h.controller.setPageFile(SESSION, tab.contentId, ADDRESS)
+    expect(h.controller.filePathOf(tab.contentId)).toBe('api/invoice.py')
+    expect(h.controller.activeFile.getSnapshot()).toMatchObject({
+      sessionId: SESSION, address: ADDRESS, path: 'api/invoice.py',
+    })
+  })
+
   it('drops the file when the focused tab is not a file resource', () => {
     const h = controllerHarness()
     h.publish()

@@ -118,6 +118,7 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'settings/describe': 'owner-only', // owner settings
   'settings/mutate': 'owner-only', // owner settings
   'settings/openSettingsDocument': 'owner-only', // owner settings
+  'settings/prepareSettingsDocument': 'owner-only', // owner settings
   'settings/replace': 'owner-only', // owner settings
   'settings/update': 'owner-only', // owner settings
   'terminal/attach': 'owner-only', // owner terminals
@@ -146,7 +147,9 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'workspaceFiles/list': 'owner-only', // owner Workspace file access'
   'workspaceFiles/read': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
   'workspaceFiles/readBytes': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
+  'workspaceFiles/readDocument': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
   'workspaceFiles/search': 'owner-only', // owner Workspace file access
+  'workspaceFiles/writeDocument': 'owner-only', // editor saves are owner-only
   'workspaceFiles/stat': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
   'pluginManager/cancelInstall': 'owner-only', // owner plugin management
   'pluginManager/inspect': 'owner-only', // owner plugin management
