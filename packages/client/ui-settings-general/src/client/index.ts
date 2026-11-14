@@ -32,7 +32,6 @@ import type {
   SettingsOnboardingStep, SettingsRootInjected, SettingsSectionRow,
 } from './shell-contract.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { createSettingsShellStore } from './shell-store.ts'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { DesktopUpdateBadge } from './DesktopUpdateIndicator.tsx'
@@ -144,13 +143,12 @@ export function apply(ctx: ClientContext): void {
   // The shared ConfigForm mirror updates after document commits and reconnects.
   const openSettingsDocument = (path: string): void => {
     const sidebar = ctx.get('sidebarRight') as {
-      mounted: { getSnapshot(): import('@deepseek-ai/dsh-session/types').SessionId | undefined }
       openTab(kind: string, options: { params: { path: string } }): void
     } | undefined
     if (sidebar === undefined) return
-    const sessionId = sidebar.mounted.getSnapshot()
-    const address = sessionId === undefined ? path : sessionFileAddress(sessionId, path)
-    sidebar.openTab('file-editor', { params: { path: address } })
+    // Keep the Host's absolute path: this client bundle does not materialize
+    // the workspace-path helper, and the editor reads absolute paths directly.
+    sidebar.openTab('file-editor', { params: { path } })
   }
   const documentController = ctx.remote.$host.isLoopback
     ? new SettingsDocumentStore(ctx, ctx.configForms.describe(), openSettingsDocument)
