@@ -5,15 +5,15 @@
  * both back so a file that changed on disk becomes a conflict instead of a
  * silent overwrite. The shell owns the Monaco vendor and its worker.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceFileDocument, WorkspaceFileWrite } from '@deepseek-ai/dsh-api-workspace-files'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SidebarRightTabDefinition, SidebarTextSelection } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { FileTypeIcon, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
-import { parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
+import { isEditableFileAddress, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { loadMonacoLanguage, monaco } from './monaco-api.ts'
 import type { MonacoEditor } from './monaco-api.ts'
 import css from './EditorBody.module.css'
@@ -74,7 +74,8 @@ export interface EditorTitleInjected {
 }
 
 /** Standard tab seat, namespace copy, and the complete-file operations. */
-export type EditorBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarFiles'> & InjectFace<EditorInjected>
+export type EditorBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsRenderFactories
+  & PropsLocale<'sidebarFiles'> & InjectFace<EditorInjected>
 
 /** The editor type's registry definition. */
 export function editorDefinition(t: TranslateNS<'sidebarFiles'>): SidebarRightTabDefinition {
@@ -99,6 +100,31 @@ export function EditorTitle({ useTabInfo, pathFor }: PropsRuntime<'sidebar.right
     </>
   )
 }
+
+/** The navigator and toggle share the tab's runtime and factory renderer. */
+type EditorNavigatorSeatProps = Pick<PropsRuntime<'sidebar.right.pane.tab'>, 'useTabInfo'> & PropsRenderFactories
+
+/** The workspace navigator beside the editor's content row. */
+const EditorNavigator = memo(function EditorNavigator({ useTabInfo, renderFactorySlot }: EditorNavigatorSeatProps): ReactNode {
+  const { tab, panel } = useTabInfo()
+  const onOpen = useCallback((address: string): void => {
+    if (isEditableFileAddress(address)) {
+      tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+      return
+    }
+    if (panel.isFloating) tab.actions.openResource(address)
+    else tab.actions.openResource(address, { paneId: panel.id })
+  }, [tab.actions, panel.id, panel.isFloating])
+  const onEdit = useCallback((address: string): void => {
+    tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+  }, [tab.actions, panel.id, panel.isFloating])
+  return renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: false, onOpen, onEdit })
+})
+
+/** The navigator's show/hide control in the editor header. */
+const EditorNavigatorToggle = memo(function EditorNavigatorToggle({ useTabInfo, renderFactorySlot }: EditorNavigatorSeatProps): ReactNode {
+  return renderFactorySlot('sidebar.files.navigator.toggle', { useTabInfo })
+})
 
 /** Languages registered by the shell's selective Monaco vendor, in picker order. */
 const EDITOR_LANGUAGES: readonly { readonly id: string; readonly label: string }[] = [
@@ -153,7 +179,7 @@ function darkTheme(): boolean {
  */
 export function EditorBody({
   sessionId, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
-  publishFile, clearFile, t,
+  publishFile, clearFile, renderFactorySlot, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
@@ -370,14 +396,18 @@ export function EditorBody({
         <button type="button" className={css.action} disabled={saving} onClick={() => { setReloadKey(key => key + 1) }}>
           {t('editor.revert')}
         </button>
+        <EditorNavigatorToggle useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />
       </div>
       {error === undefined ? null : <div className={css.error} role="alert" data-editor-error>{error}</div>}
-      {monaco() === undefined
-        ? <textarea className={css.fallback} value={text} spellCheck={false} onChange={(event) => {
-          setText(event.target.value)
-          setDirty(event.target.value !== savedText.current)
-        }} />
-        : <div ref={hostRef} className={css.host} data-monaco-editor />}
+      <div className={css.editorRow} data-files-navigator-row>
+        {monaco() === undefined
+          ? <textarea className={css.fallback} value={text} spellCheck={false} onChange={(event) => {
+            setText(event.target.value)
+            setDirty(event.target.value !== savedText.current)
+          }} />
+          : <div ref={hostRef} className={css.host} data-monaco-editor />}
+        <EditorNavigator useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />
+      </div>
       <footer className={css.footer}>
         <select className={css.language} value={language} aria-label={t('editor.language')}
           onChange={(event) => { setLanguage(event.target.value) }}>

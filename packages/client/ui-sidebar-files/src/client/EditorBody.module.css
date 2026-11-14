@@ -59,6 +59,15 @@
   cursor: default;
 }
 
+.editorRow {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .host {
   flex: 1 1 auto;
   min-width: 0;
