@@ -88,17 +88,34 @@ export function apply(ctx: ClientContext): void {
   // remember the address per content so the editor can reload its file.
   const editorPaths = createSnapshotStore<Record<string, string>>({}, { persist: { name: 'sidebarEditorPaths' } })
   const accountName = createSnapshotStore<string | undefined>(undefined)
+  const accountBalance = createSnapshotStore<string | undefined>(undefined)
   // The account plugin owns profile reads; mirror only its display name for
   // the editor status line, including profile after view, balance, and avatar updates.
   ctx.inject(['accountUi'], (accountCtx) => {
-    type AccountState = { details?: { profile?: { status?: string; value?: { name?: string } } } }
+    type Wallet = { readonly currency: 'CNY' | 'USD'; readonly balance: string }
+    type AccountState = {
+      details?: {
+        profile?: { status?: string; value?: { name?: string } }
+        balance?: { status?: string; value?: readonly Wallet[] }
+      }
+    }
     const account = accountCtx.get('accountUi') as unknown as {
       getSnapshot(): AccountState
       subscribe(listener: () => void): () => void
     }
     const sync = (): void => {
-      const profile = account.getSnapshot().details?.profile
+      const details = account.getSnapshot().details
+      const profile = details?.profile
       accountName.set(profile?.status === 'ready' ? profile.value?.name : undefined)
+      const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
+      accountBalance.set(wallets === undefined || wallets.length === 0 ? undefined
+        : wallets.map((wallet) => {
+          const symbol = wallet.currency === 'CNY' ? '¥' : '$'
+          const value = Number(wallet.balance)
+          return Number.isFinite(value)
+            ? symbol + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : symbol + wallet.balance
+        }).join(' '))
     }
     sync()
     accountCtx.effect(() => account.subscribe(sync), 'ui-sidebar-files: account name')
@@ -300,7 +317,7 @@ export function apply(ctx: ClientContext): void {
         return null
       }
     },
-    hooks: { accountName },
+    hooks: { accountName, accountBalance },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')

@@ -69,8 +69,11 @@ export interface EditorInjected {
   readonly clearFile: (contentId: string, address: string) => void
   /** Read the workspace checkout's current branch for the status line. */
   readonly readBranch: (signal: AbortSignal) => Promise<string | null>
-  /** Live account display name for the status line. */
-  readonly hooks: { readonly accountName: ObservableSnapshot<string | undefined> }
+  /** Live account display name and recharge balance for the status line. */
+  readonly hooks: {
+    readonly accountName: ObservableSnapshot<string | undefined>
+    readonly accountBalance: ObservableSnapshot<string | undefined>
+  }
 }
 
 /** The title's access to the address a restored page recovered. */
@@ -184,7 +187,7 @@ function darkTheme(): boolean {
  */
 export function EditorBody({
   sessionId, useSessions, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
-  publishFile, clearFile, readBranch, useAccountName, renderFactorySlot, t,
+  publishFile, clearFile, readBranch, useAccountName, useAccountBalance, renderFactorySlot, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
@@ -193,6 +196,7 @@ export function EditorBody({
   const sessionTitle = useSessions(state => state.byId[sessionId]?.displayTitle)
   const workspacePath = useSessions(state => state.byId[sessionId]?.cwd)
   const accountName = useAccountName(value => value)
+  const accountBalance = useAccountBalance(value => value)
   const [branch, setBranch] = useState<string>()
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
@@ -440,6 +444,8 @@ export function EditorBody({
             : <span className={css.statusItem} title={workspacePath} data-editor-workspace>{workspaceName}</span>}
           {accountName === undefined ? null
             : <span className={css.statusItem} title={accountName} data-editor-account>{accountName}</span>}
+          {accountBalance === undefined ? null
+            : <span className={css.statusItem} title={accountBalance} data-editor-balance>{accountBalance}</span>}
         </div>
         <select className={css.language} value={language} aria-label={t('editor.language')}
           onChange={(event) => { setLanguage(event.target.value) }}>
