@@ -434,10 +434,11 @@ export function EditorBody({
         <EditorNavigator useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />
       </div>
       <footer className={css.footer}>
+        {branch === undefined ? null : <span className={css.branch} title={branch} data-editor-branch>
+          <IconBranchOutlineRegular size={12} />
+          <span className={css.branchLabel}>{branch}</span>
+        </span>}
         <div className={css.status} data-editor-status>
-          {branch === undefined ? null : <span className={css.statusItem} title={branch} data-editor-branch>
-            <IconBranchOutlineRegular size={12} />{branch}
-          </span>}
           {sessionTitle === undefined ? null
             : <span className={css.statusItem} title={sessionTitle} data-editor-session>{sessionTitle}</span>}
           {workspaceName === undefined ? null
@@ -445,7 +446,7 @@ export function EditorBody({
           {accountName === undefined ? null
             : <span className={css.statusItem} title={accountName} data-editor-account>{accountName}</span>}
           {accountBalance === undefined ? null
-            : <span className={css.statusItem} title={accountBalance} data-editor-balance>{accountBalance}</span>}
+            : <span className={`${css.statusItem} ${css.statusBalance}`} title={accountBalance} data-editor-balance>{accountBalance}</span>}
         </div>
         <select className={css.language} value={language} aria-label={t('editor.language')}
           onChange={(event) => { setLanguage(event.target.value) }}>
