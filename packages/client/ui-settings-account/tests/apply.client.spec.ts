@@ -283,6 +283,39 @@ it('keeps successful account refreshes silent and reports only failed reads', as
   expect(JSON.stringify(output.mock.calls)).not.toContain('private-rpc-detail')
 }, 60_000)
 
+it('re-reads the account when a top-level turn ends and ignores subagent turns', async ({ start }) => {
+  vi.stubGlobal('dshDesktop', {})
+  const c = await start()
+  const actions = operations(c)
+  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
+  c.mock.remote.account.getBalance.mockResolvedValue(ok({
+    status: 'ready', value: [{ currency: 'CNY', balance: '6.71' }], bonusWallets: [],
+  }))
+  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
+  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.balance).toBeDefined() })
+  expect(c.mock.remote.account.getBalance).toHaveBeenCalledOnce()
+  const summary = (sessionId: string, origin?: 'subagent') => ({
+    agentAvailable: true, sessionId, updatedAt: 1, running: true, blank: false,
+    ...(origin === undefined ? {} : { origin }),
+  })
+  c.mock.streams.push('$events', { type: 'emit', event: 'api-session/added', args: [summary('session-turn')] })
+  await c.flush()
+  c.mock.streams.push('$events', { type: 'emit', event: 'api-session/status', args: ['session-turn', false] })
+  await vi.waitFor(() => { expect(c.mock.remote.account.getBalance).toHaveBeenCalledTimes(2) })
+  // A subagent's turn end belongs to the parent turn and must not read again.
+  c.mock.streams.push('$events', { type: 'emit', event: 'api-session/added', args: [summary('subagent-turn', 'subagent')] })
+  await c.flush()
+  c.mock.streams.push('$events', { type: 'emit', event: 'api-session/status', args: ['subagent-turn', false] })
+  await c.flush()
+  expect(c.mock.remote.account.getBalance).toHaveBeenCalledTimes(2)
+  // A Session already idle at first sight did not finish a turn in this Client.
+  c.mock.streams.push('$events', {
+    type: 'emit', event: 'api-session/added', args: [{ ...summary('session-idle'), running: false }],
+  })
+  await c.flush()
+  expect(c.mock.remote.account.getBalance).toHaveBeenCalledTimes(2)
+}, 60_000)
+
 it('coalesces refreshes, publishes independent failures, and rejects stale responses after sign-out or unload', async ({ start }) => {
   vi.stubGlobal('dshDesktop', {})
   const c = await start()

@@ -54,6 +54,7 @@ it.each(['accepted', 'refused', 'disconnected', 'pending'] as const)('initialize
         return () => {}
       },
     },
+    sessions: { list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: {} }) } },
     remote: {
       $on: () => () => {},
       session: { initializeDefaultModel },

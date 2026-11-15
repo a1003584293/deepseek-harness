@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-api-remote-access/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { AccountUpdate, AccountDetails } from '@deepseek-ai/dsh-deepseek-account/types'
 import type { OnboardingChange } from './onboarding-contract.ts'
 import type { PlatformBridge } from './PlatformOverlay.tsx'
@@ -42,7 +43,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Services required by account settings. */
-export const inject = ['slots', 'locale', 'remote', 'remote.account', 'remote.session', 'theme', 'configForms', 'remoteAccess']
+export const inject = ['slots', 'locale', 'remote', 'remote.account', 'remote.session', 'sessions', 'theme', 'configForms', 'remoteAccess']
 /** Register account UI in Desktop and plain Web clients. @param ctx - client plugin context. */
 export function apply(ctx: Context): void {
   const desktop = 'dshDesktop' in globalThis
@@ -112,10 +113,27 @@ export function apply(ctx: Context): void {
       },
     })
     let accountGeneration = 0
+    // Re-read profile and balance after each top-level turn ends, so account
+    // details follow the usage the turn consumed. Subagent turns belong to
+    // their parent turn.
+    let running = new Map<string, boolean>()
+    const stopTurnWatch = ctx.sessions.list.subscribe(() => {
+      const { byId } = ctx.sessions.list.getSnapshot()
+      const previous = running
+      const next = new Map<string, boolean>()
+      let finished = false
+      for (const summary of Object.values(byId)) {
+        next.set(summary.id, summary.running)
+        if (previous.get(summary.id) === true && !summary.running && summary.origin !== 'subagent') finished = true
+      }
+      running = next
+      if (finished) void refresh()
+    })
     // Read across closures: the disposer ends this grant while the frame loop awaits.
     const grant = { ended: false }
     // Revocation clears shared account state before another access grant can start.
     yield () => {
+      stopTurnWatch()
       grant.ended = true
       revision++
       refreshing = undefined

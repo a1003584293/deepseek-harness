@@ -69,6 +69,7 @@ it('withdraws every account surface and the account stream on revocation, and re
         return () => {}
       },
     },
+    sessions: { list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: {} }) } },
     remote: {
       $on: () => () => {},
       session: { initializeDefaultModel: async () => ({ ok: true, value: undefined }) },
@@ -149,6 +150,7 @@ it('drops reads a revoked grant started, and the next grant shows no account sec
         return () => {}
       },
     },
+    sessions: { list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: {} }) } },
     remote: {
       $on: () => () => {},
       session: { initializeDefaultModel: async () => ({ ok: true, value: undefined }) },
@@ -243,6 +245,7 @@ function revocationHarness(scripts: StreamScript[]) {
         return () => {}
       },
     },
+    sessions: { list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: {} }) } },
     remote: {
       $on: () => () => {},
       session: { initializeDefaultModel: async () => ({ ok: true, value: undefined }) },
