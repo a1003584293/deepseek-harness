@@ -17,8 +17,8 @@ import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
   type ArchiveSessionInjected, menuOpenStateFactory, type PinSessionInjected,
-  type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
-  type WorkspaceViewStoreHandle,
+  type RowToastInjected, type SessionArchiveConfirmInjected, type SessionDeleteConfirmInjected,
+  type SessionRenameDialogInjected, type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionRowButton, SessionArchiveConfirmDialog } from '../src/client/session-actions/ArchiveSession.tsx'
@@ -146,11 +146,13 @@ async function bench(access: 'fake' | 'static' = 'fake') {
     unpinSession,
     insertSessionBefore: vi.fn(async () => ({})),
   } as never)
+  const refresh = vi.fn(async () => undefined)
   ctx.provide('sessions', {
     list: { getSnapshot: () => sessionSnapshot, subscribe },
     create: vi.fn(async () => 'created' as never),
     retain,
     using,
+    refresh,
     search,
     searchResultLimit: 20,
     binding,
@@ -162,8 +164,10 @@ async function bench(access: 'fake' | 'static' = 'fake') {
   } as never)
   const pickDirectory = vi.fn(() => Promise.resolve({ ok: true as const, value: '/projects/picked' }))
   const directoryPicker = { pick: pickDirectory }
-  Object.assign(new TestRemote(ctx), { directoryPicker })
+  const deleteSession = vi.fn(async (_request: { sessionId: SessionId }) => ({ ok: true as const, value: undefined }))
+  Object.assign(new TestRemote(ctx), { directoryPicker, session: { delete: deleteSession } })
   ctx.provide('remote.directoryPicker', directoryPicker as never)
+  ctx.provide('remote.session', { delete: deleteSession } as never)
   const locale = new LocaleRuntime(ctx)
   // These specs assert the shipped Chinese copy. There is no jsdom `window`
   // in this lane, so browser-language detection never runs and the locale
@@ -174,6 +178,7 @@ async function bench(access: 'fake' | 'static' = 'fake') {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename, commands, accessSource,
     whenResourceAccess, stopGuard, status,
     retain, using, selectPanel, search, renameSession, binding, fork, pickDirectory, pinSession, unpinSession,
+    refresh, deleteSession,
     workspacesSubscribe, initializeDefault, history, scope, sessionOf,
     setWorkspaces: (snapshot: WorkspaceSnapshot): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
@@ -246,8 +251,8 @@ describe('ui-workspace apply', () => {
 
   it('declares the services it drives', () => {
     expect(inject).toEqual(['contextMenus',
-      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'layout', 'shortcuts', 'remoteAccess',
-      'uiSession', 'uiSession.sessionStatus',
+      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'remote.session', 'layout',
+      'shortcuts', 'remoteAccess', 'uiSession', 'uiSession.sessionStatus',
     ])
   })
 
@@ -595,6 +600,22 @@ describe('ui-workspace apply', () => {
     }
     // A rejected archive raises no notice.
     expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'archived', sessionId: 'one', seq: 1 })
+  })
+
+  it('deletes the stored Session through the Remote session namespace and refreshes the list', async () => {
+    const b = await bench()
+    declare(b.slots, 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const injected = faceOf(entry(b.slots, 'shell.overlay', 'workspace.session-delete')) as SessionDeleteConfirmInjected
+
+    await injected.deleteSession(sid('one'))
+    expect(b.deleteSession).toHaveBeenCalledExactlyOnceWith({ sessionId: 'one' })
+    expect(b.refresh).toHaveBeenCalledOnce()
+
+    // A Host refusal keeps the message for the dialog and refreshes nothing.
+    b.deleteSession.mockResolvedValueOnce({ ok: false, error: new Error('session/delete failed') } as never)
+    await expect(injected.deleteSession(sid('two'))).rejects.toThrow('session/delete failed')
+    expect(b.refresh).toHaveBeenCalledOnce()
   })
 
   it('turns the Host\'s running-work refusal into the stop-and-archive confirmation, which archives with stopActivity', async () => {

@@ -82,7 +82,7 @@ async function bench(): Promise<SlotTestRuntime> {
   runtime.releaseWorkspaceSource()
   // Directory picking goes through the probe occupant; the namespace only has
   // to be there for ui-workspace's inject to settle.
-  runtime.remote.provideNamespaces({ directoryPicker: {} })
+  runtime.remote.provideNamespaces({ directoryPicker: {}, session: { delete: vi.fn() } })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)

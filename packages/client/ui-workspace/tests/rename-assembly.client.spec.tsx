@@ -42,10 +42,10 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   runtime.ctx.provide('shortcuts', { register: () => () => {}, catalog: createSnapshotStore([]) })
   runtime.ctx.provide('layout', { selectPanel: vi.fn(), beginNavigation: () => new AbortController().signal })
   runtime.releaseWorkspaceSource()
-  // The rename flow never picks a directory; the namespace only has to be there
-  // for ui-workspace's inject to settle.
+  // The rename flow never picks a directory or deletes a Session; the namespaces
+  // only have to be there for ui-workspace's inject to settle.
   const directoryPicker = {}
-  runtime.remote.provideNamespaces({ directoryPicker })
+  runtime.remote.provideNamespaces({ directoryPicker, session: { delete: vi.fn() } })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
