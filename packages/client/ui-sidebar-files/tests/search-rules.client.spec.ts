@@ -108,7 +108,7 @@ describe('rule list', () => {
   it('starts from every default, enabled, in default order', () => {
     expect(defaultRules()).toEqual(DEFAULTS.map(path => ({ path, enabled: true })))
     expect(enabledPaths(defaultRules())).toEqual(DEFAULTS)
-    expect(defaultSearchPreferences()).toEqual({ rules: defaultRules(), showHidden: false, respectGitignore: true })
+    expect(defaultSearchPreferences()).toEqual({ rules: defaultRules(), showHidden: true, respectGitignore: true })
     expect(defaultRules()).not.toBe(defaultRules())
     // Every default is a path the reader could type, unchanged by normalization.
     expect(DEFAULTS.map(path => normalizeRulePath(path))).toEqual(DEFAULTS.map(path => ({ kind: 'ok', path })))
@@ -215,14 +215,14 @@ describe('changedSearchPreferences', () => {
   it('keeps only the fields that differ from the defaults, rule order and enabled state included', () => {
     const defaults = defaultSearchPreferences()
     expect(changedSearchPreferences(defaults)).toBeUndefined()
-    expect(changedSearchPreferences({ ...defaults, showHidden: true })).toEqual({ showHidden: true })
+    expect(changedSearchPreferences({ ...defaults, showHidden: false })).toEqual({ showHidden: false })
     expect(changedSearchPreferences({ ...defaults, respectGitignore: false })).toEqual({ respectGitignore: false })
     expect(changedSearchPreferences({ ...defaults, rules: defaults.rules.slice(1) })).toEqual({ rules: defaults.rules.slice(1) })
     const reversed = [...defaults.rules].reverse()
     expect(changedSearchPreferences({ ...defaults, rules: reversed })).toEqual({ rules: reversed })
     const disabled = setRuleEnabled(defaults.rules, 'dist', false)
-    expect(changedSearchPreferences({ rules: disabled, showHidden: true, respectGitignore: false }))
-      .toEqual({ rules: disabled, showHidden: true, respectGitignore: false })
+    expect(changedSearchPreferences({ rules: disabled, showHidden: false, respectGitignore: false }))
+      .toEqual({ rules: disabled, showHidden: false, respectGitignore: false })
   })
 })
 

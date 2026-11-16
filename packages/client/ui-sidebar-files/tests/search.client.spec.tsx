@@ -124,7 +124,7 @@ describe('the search bar', () => {
     await shown(h)
     expect(h.view.queryByRole('button', { name: zh['search.clear'] })).toBeNull()
     await type(h, ' Ab ', ['src/tab.ts', 'lib/AB/', 'lib/AB/x.ts'])
-    expect(requests(h)).toEqual([{ query: 'Ab', excludedPaths: enabledPaths(defaultRules()), includeHidden: false, respectGitignore: true }])
+    expect(requests(h)).toEqual([{ query: 'Ab', excludedPaths: enabledPaths(defaultRules()), includeHidden: true, respectGitignore: true }])
     expect(status(h)).toBe(t('search.results', { count: '3' }))
     expect(paths(h)).toEqual([`${ROOT}/lib`, `${ROOT}/lib/AB`, `${ROOT}/lib/AB/x.ts`, `${ROOT}/src`, `${ROOT}/src/tab.ts`])
     expect([...body(h).querySelectorAll('mark')].map(mark => mark.textContent)).toEqual(['AB', 'ab'])
@@ -184,7 +184,7 @@ describe('the search bar', () => {
     await shown(h)
     await type(h, 'zzz')
     expect(body(h).textContent).toBe(zh['search.empty'])
-    expect(emptyHint(h)).toBe(zh['search.emptyHint.all'])
+    expect(emptyHint(h)).toBe(zh['search.emptyHint.excludedIgnored'])
     expect(status(h)).toBe(t('search.results', { count: '0' }))
     const settle = async (preferences: Partial<WorkspaceSearchPreferences>): Promise<string | undefined> => {
       await settled(() => { h.face.setSearchPreferences(ROOT, preferences) })
@@ -225,7 +225,7 @@ describe('the search bar', () => {
     h.searches.answerWith(answer([], { truncated: true, incomplete: true }))
     await type(h, 'zzz')
     expect(body(h).textContent).toBe(`${zh['search.empty']}${t('search.truncated', { count: '0' })}${zh['search.incomplete']}`)
-    expect(emptyHint(h)).toBe(zh['search.emptyHint.all'])
+    expect(emptyHint(h)).toBe(zh['search.emptyHint.excludedIgnored'])
   })
 
   it('keeps the last results drawn with a spinner while the next search runs, and draws only a spinner before the first answer', async () => {
@@ -290,36 +290,38 @@ describe('the search bar', () => {
 })
 
 describe('the hidden-entry control', () => {
-  it('leaves hidden entries out of the tree and the search until pressed, and shows them in both while pressed', async () => {
+  it('shows hidden entries in the tree and the search until pressed, and leaves them out of both while pressed', async () => {
     const h = mountNavigator('sidebar://files')
     await shown(h)
     const eye = (): HTMLElement => h.view.container.querySelector<HTMLElement>('[data-files-show-hidden]')!
-    expect(eye().getAttribute('aria-pressed')).toBe('false')
-    expect(eye().getAttribute('aria-label')).toBe(zh['search.showHidden'])
-    // The name stays fixed; only `aria-pressed` reports the state.
-    expect(paths(h)).not.toContain(`${ROOT}/.env`)
-    act(() => { fireEvent.click(eye()) })
     expect(eye().getAttribute('aria-pressed')).toBe('true')
     expect(eye().getAttribute('aria-label')).toBe(zh['search.showHidden'])
+    // The name stays fixed; only `aria-pressed` reports the state.
     expect(paths(h)).toContain(`${ROOT}/.env`)
-    await type(h, 'env', ['.env'])
-    expect(requests(h)[0]?.includeHidden).toBe(true)
-    expect(paths(h)).toEqual([`${ROOT}/.env`])
-    // Changing it during a search searches again at once.
     act(() => { fireEvent.click(eye()) })
-    expect(requests(h)[1]?.includeHidden).toBe(false)
+    expect(eye().getAttribute('aria-pressed')).toBe('false')
+    expect(eye().getAttribute('aria-label')).toBe(zh['search.showHidden'])
+    expect(paths(h)).not.toContain(`${ROOT}/.env`)
+    await type(h, 'env', ['.env'])
+    expect(requests(h)[0]?.includeHidden).toBe(false)
+    // A hidden match stays out of the drawn results too.
+    expect(paths(h)).toEqual([])
+    // Changing it during a search searches again at once and draws the match.
+    act(() => { fireEvent.click(eye()) })
+    expect(requests(h)[1]?.includeHidden).toBe(true)
+    expect(paths(h)).toEqual([`${ROOT}/.env`])
   })
 
-  it('says a directory holding only hidden entries holds hidden entries, not that it is empty', async () => {
+  it('says a directory holding only hidden entries holds hidden entries once they are left out', async () => {
     const h = mountNavigator('sidebar://files')
     act(() => { h.instance.actions.shown(PANE, true) })
     await act(() => h.script.watches.ready(ROOT))
     await act(() => h.script.settle({ ok: true, value: { entries: [{ name: '.env', type: 'file', size: 1 }], truncated: false } }))
+    expect(paths(h)).toEqual([`${ROOT}/.env`])
+    expect(body(h).querySelector('[data-files-row="hidden-only"]')).toBeNull()
+    act(() => { fireEvent.click(h.view.container.querySelector('[data-files-show-hidden]')!) })
     expect(body(h).querySelector('[data-files-row="empty"]')).toBeNull()
     expect(body(h).querySelector('[data-files-row="hidden-only"]')?.textContent).toBe(zh.emptyHidden)
-    act(() => { fireEvent.click(h.view.container.querySelector('[data-files-show-hidden]')!) })
-    expect(body(h).querySelector('[data-files-row="hidden-only"]')).toBeNull()
-    expect(paths(h)).toEqual([`${ROOT}/.env`])
   })
 
   it('applies exclusions only to the search, so the tree still lists excluded directories', async () => {
@@ -342,7 +344,7 @@ describe('the hidden-entry control', () => {
     })
     const eye = (h: Mounted): string | null => h.view.container.querySelector('[data-files-show-hidden]')!.getAttribute('aria-pressed')
     act(() => { fireEvent.click(one.view.container.querySelector('[data-files-show-hidden]')!) })
-    expect([eye(one), eye(two), eye(other)]).toEqual(['true', 'true', 'false'])
+    expect([eye(one), eye(two), eye(other)]).toEqual(['false', 'false', 'true'])
   })
 })
 
@@ -377,7 +379,7 @@ describe('the settings panel', () => {
     expect(stored(h).rules.find(rule => rule.path === 'dist')?.enabled).toBe(false)
     expect(document.activeElement).toBe(settingsButton(h))
     expect(requests(h)).toEqual([requests(h)[0], {
-      query: 'a', excludedPaths: enabledPaths(defaultRules()).filter(path => path !== 'dist'), includeHidden: false, respectGitignore: true,
+      query: 'a', excludedPaths: enabledPaths(defaultRules()).filter(path => path !== 'dist'), includeHidden: true, respectGitignore: true,
     }])
 
     toggle()
@@ -504,10 +506,10 @@ describe('the settings panel', () => {
     const h = mountNavigator('sidebar://files')
     await shown(h)
     const panel = open(h)
-    act(() => { h.face.setSearchPreferences(ROOT, { showHidden: true }) })
+    act(() => { h.face.setSearchPreferences(ROOT, { showHidden: false }) })
     pointerClick(within(panel).getByRole('checkbox', { name: t('settings.toggle', { path: 'dist' }) }))
     pointerClick(within(panel).getByRole('button', { name: zh['settings.close'] }))
-    expect(stored(h).showHidden).toBe(true)
+    expect(stored(h).showHidden).toBe(false)
     expect(stored(h).rules.find(rule => rule.path === 'dist')?.enabled).toBe(false)
   })
 
@@ -520,10 +522,10 @@ describe('the settings panel', () => {
     pointerClick(eye)
     expect(dialog(h)).toBeNull()
     expect(document.activeElement).toBe(eye)
-    expect(eye.getAttribute('aria-pressed')).toBe('true')
-    expect(stored(h).showHidden).toBe(true)
+    expect(eye.getAttribute('aria-pressed')).toBe('false')
+    expect(stored(h).showHidden).toBe(false)
     expect(stored(h).rules.find(rule => rule.path === 'dist')?.enabled).toBe(false)
-    expect(paths(h)).toContain(`${ROOT}/.env`)
+    expect(paths(h)).not.toContain(`${ROOT}/.env`)
     expect(within(open(h)).getByRole('checkbox', { name: t('settings.toggle', { path: 'dist' }) })).toHaveProperty('checked', false)
   })
 

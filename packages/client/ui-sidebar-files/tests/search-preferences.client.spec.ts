@@ -34,10 +34,10 @@ describe('workspaceKey', () => {
 describe('createSearchPreferenceBook', () => {
   it('writes only the roots the reader changed, and drops a root changed back to the defaults', () => {
     const book = persisted()
-    const chosen = { rules: [{ path: 'out', enabled: false }], showHidden: true, respectGitignore: false }
+    const chosen = { rules: [{ path: 'out', enabled: false }], showHidden: false, respectGitignore: false }
     book.update('/work/app/', chosen)
-    book.update('/work/lib', { ...defaultSearchPreferences(), showHidden: true })
-    expect(stored()).toEqual({ '/work/app': chosen, '/work/lib': { showHidden: true } })
+    book.update('/work/lib', { ...defaultSearchPreferences(), showHidden: false })
+    expect(stored()).toEqual({ '/work/app': chosen, '/work/lib': { showHidden: false } })
     expect(book.source('/work/app').getSnapshot()).toEqual(chosen)
     book.update('/work/lib', defaultSearchPreferences())
     expect(stored()).toEqual({ '/work/app': chosen })
@@ -46,23 +46,23 @@ describe('createSearchPreferenceBook', () => {
 
   it('changes only the fields a patch names, over the root\'s preferences at the time of the change', () => {
     const book = persisted()
-    book.update('/work/app', { showHidden: true })
-    book.update('/work/app', { rules: [{ path: 'out', enabled: true }] })
-    expect(book.source('/work/app').getSnapshot()).toEqual({ rules: [{ path: 'out', enabled: true }], showHidden: true, respectGitignore: true })
     book.update('/work/app', { showHidden: false })
+    book.update('/work/app', { rules: [{ path: 'out', enabled: true }] })
+    expect(book.source('/work/app').getSnapshot()).toEqual({ rules: [{ path: 'out', enabled: true }], showHidden: false, respectGitignore: true })
+    book.update('/work/app', { showHidden: true })
     book.update('/work/app', { respectGitignore: false })
-    expect(book.source('/work/app').getSnapshot()).toEqual({ rules: [{ path: 'out', enabled: true }], showHidden: false, respectGitignore: false })
+    expect(book.source('/work/app').getSnapshot()).toEqual({ rules: [{ path: 'out', enabled: true }], showHidden: true, respectGitignore: false })
     // A `.gitignore` choice alone differs from the defaults, so only it is stored.
     book.update('/work/app', { rules: defaultSearchPreferences().rules })
     expect(stored()).toEqual({ '/work/app': { respectGitignore: false } })
   })
 
   it('leaves the rules out of an entry whose rules the reader did not change, so the running build\'s default list applies', () => {
-    persisted().update('/work/app', { showHidden: true })
-    expect(stored()).toEqual({ '/work/app': { showHidden: true } })
+    persisted().update('/work/app', { showHidden: false })
+    expect(stored()).toEqual({ '/work/app': { showHidden: false } })
     // An entry another build stored without rules reads the default list of this build.
-    localStorage.setItem(SEARCH_PREFERENCES_KEY, JSON.stringify({ '/work/app': { showHidden: true, respectGitignore: false } }))
-    expect(persisted().source('/work/app').getSnapshot()).toEqual({ ...defaultSearchPreferences(), showHidden: true, respectGitignore: false })
+    localStorage.setItem(SEARCH_PREFERENCES_KEY, JSON.stringify({ '/work/app': { showHidden: false, respectGitignore: false } }))
+    expect(persisted().source('/work/app').getSnapshot()).toEqual({ ...defaultSearchPreferences(), showHidden: false, respectGitignore: false })
   })
 
   it('keeps each root\'s snapshot until that root changes', () => {
@@ -92,8 +92,8 @@ describe('createSearchPreferenceBook', () => {
     expect(book.source('/work/app').getSnapshot()).toEqual({ rules: [{ path: 'out', enabled: true }], showHidden: true, respectGitignore: true })
     expect(book.source('/work/lib').getSnapshot()).toEqual({ rules: [], showHidden: false, respectGitignore: false })
     // Saving an entry that stored every field keeps only those that differ from the defaults.
-    book.update('/work/full', { showHidden: true })
-    expect(stored()).toMatchObject({ '/work/full': { showHidden: true } })
+    book.update('/work/full', { showHidden: false })
+    expect(stored()).toMatchObject({ '/work/full': { showHidden: false } })
     expect(book.source('/work/bad').getSnapshot()).toEqual({ ...defaultSearchPreferences(), showHidden: true })
     expect(book.source('/work/odd').getSnapshot()).toEqual(defaultSearchPreferences())
   })
@@ -107,7 +107,7 @@ describe('createSearchPreferenceBook', () => {
     const book = persisted()
     expect(book.source('/work/app').getSnapshot()).toEqual(defaultSearchPreferences())
     book.update('/work/app', { rules: [], showHidden: false })
-    expect(stored()).toEqual({ '/work/app': { rules: [] } })
+    expect(stored()).toEqual({ '/work/app': { rules: [], showHidden: false } })
   })
 
   it('reads storage that is not JSON as no preferences', () => {

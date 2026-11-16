@@ -192,7 +192,7 @@ describe('FilesBody', () => {
     expect(h.view.queryByRole('dialog')).toBeNull()
   })
 
-  it('lists the root on mount, heads it with its path split at the last segment, and draws directories first with dotfiles shown once the reader asks', async () => {
+  it('lists the root on mount, heads it with its path split at the last segment, and draws directories first with dotfiles included', async () => {
     const { view, script } = mountBody()
     expect(script.list).not.toHaveBeenCalled()
     await act(() => script.watches.ready(ROOT))
@@ -203,13 +203,14 @@ describe('FilesBody', () => {
     const path = view.container.querySelector('[data-files-path]')
     expect(path?.getAttribute('title')).toBe(ROOT)
     expect([...path?.firstElementChild?.children ?? []].map(span => span.textContent)).toEqual(['/work/', 'app'])
-    expect(names(view.container)).toEqual([`${ROOT}/src`, `${ROOT}/pipe`, `${ROOT}/README.md`])
-    await act(async () => { fireEvent.click(view.getByRole('button', { name: zh['search.placeholder'] })) })
-    act(() => { fireEvent.click(view.getByRole('button', { name: zh['search.showHidden'] })) })
     expect(names(view.container)).toEqual([`${ROOT}/src`, `${ROOT}/.env`, `${ROOT}/pipe`, `${ROOT}/README.md`])
     const envIcon = view.container.querySelector(`[data-files-path="${ROOT}/.env"] svg`)?.innerHTML
     const readmeIcon = view.container.querySelector(`[data-files-path="${ROOT}/README.md"] svg`)?.innerHTML
     expect(envIcon).not.toBe(readmeIcon)
+    // The eye leaves hidden entries out again.
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: zh['search.placeholder'] })) })
+    act(() => { fireEvent.click(view.getByRole('button', { name: zh['search.showHidden'] })) })
+    expect(names(view.container)).toEqual([`${ROOT}/src`, `${ROOT}/pipe`, `${ROOT}/README.md`])
   })
 
   it('heads a separator-only root by the root itself, since it has no final segment', async () => {
@@ -218,7 +219,7 @@ describe('FilesBody', () => {
     await act(() => script.settle({ ok: true, value: ROOT_LEVEL }))
     const path = view.container.querySelector('[data-files-path]')
     expect([...path?.firstElementChild?.children ?? []].map(span => span.textContent)).toEqual(['/'])
-    expect(names(view.container)).toEqual(['/src', '/pipe', '/README.md'])
+    expect(names(view.container)).toEqual(['/src', '/.env', '/pipe', '/README.md'])
   })
 
   it('marks the root path clipped while its text is wider than its box, re-reading on resize', async () => {

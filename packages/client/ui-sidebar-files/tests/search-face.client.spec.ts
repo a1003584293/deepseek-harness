@@ -59,14 +59,14 @@ describe('the face\'s search', () => {
     h.searches.answerWith(undefined)
     h.face.setQuery(PANE, ROOT, '  a ')
     expect(h.search).toHaveBeenCalledExactlyOnceWith('s-1', {
-      query: 'a', excludedPaths: enabledPaths(defaultSearchPreferences().rules), includeHidden: false, respectGitignore: true,
+      query: 'a', excludedPaths: enabledPaths(defaultSearchPreferences().rules), includeHidden: true, respectGitignore: true,
     }, expect.any(AbortSignal))
     expect(h.state()).toEqual({ pending: true, result: undefined })
     h.searches.started[0]!.settle(answer(['src/a.ts'], { truncated: true, incomplete: true }))
     await searchesSettled()
     expect(h.state()?.pending).toBe(false)
     expect(h.result()).toMatchObject({
-      kind: 'found', query: 'a', count: 1, truncated: true, incomplete: true, hiddenLeftOut: true, excluded: true,
+      kind: 'found', query: 'a', count: 1, truncated: true, incomplete: true, hiddenLeftOut: false, excluded: true,
       tree: { expanded: [ROOT, `${ROOT}/src`] },
     })
     // Whitespace around the same text searches nothing new.

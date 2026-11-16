@@ -90,10 +90,10 @@ export function defaultRules(): ExclusionRule[] {
 
 /**
  * The preferences before the reader changes anything.
- * @returns the default rules, hidden entries not shown, and `.gitignore` respected.
+ * @returns the default rules, hidden entries shown, and `.gitignore` respected.
  */
 export function defaultSearchPreferences(): WorkspaceSearchPreferences {
-  return { rules: defaultRules(), showHidden: false, respectGitignore: true }
+  return { rules: defaultRules(), showHidden: true, respectGitignore: true }
 }
 
 /**
