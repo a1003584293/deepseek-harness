@@ -56,6 +56,20 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 `pnpm run dev:web` builds, serves, and rebuilds client bundles on source edits in one terminal, and `make help` lists the matching Make targets for Web and Desktop; the guide's application commands section owns the full table.
 
+### Building the Desktop app locally (macOS arm64)
+
+```sh
+pnpm install
+ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/ \
+  pnpm run package:desktop:mac:arm64:unsigned
+```
+
+Artifacts land in `apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/`: a runnable `mac-arm64/DeepSeek Harness.app` and `deepseek-harness-<version>-mac-arm64-unsigned.dmg`. They are local unsigned (ad-hoc) builds; drag the app to Applications or copy it with `ditto`.
+
+Mirrors and proxies: Electron downloads from GitHub by default; on a slow link set `ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/` (or `electron_mirror=...` in `~/.npmrc`). The zip is cached under `apps/desktop/.desktop-build/downloads/`, so one version downloads once. npm uses the `registry=https://registry.npmmirror.com/` line in `~/.npmrc`. When GitHub is unreachable, export `https_proxy=http://127.0.0.1:1080 http_proxy=http://127.0.0.1:1080 all_proxy=socks5://127.0.0.1:1080`; `@electron/get` reads those variables only with `ELECTRON_GET_USE_PROXY=true`.
+
+The repository pins the Electron version (currently 44.7.0); newer is not automatically better. An upgrade also changes Chromium and Node, so it requires reinstalling dependencies, repackaging, and regressing the native modules (pty, sandbox, image, addon) plus mirror availability before it lands.
+
 For agents, follow [AGENTS.md](AGENTS.md).
 
 ## Citation

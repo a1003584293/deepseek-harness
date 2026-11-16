@@ -75,6 +75,20 @@ pnpm dsh web
 
 `pnpm run dev:web` 会在一个终端里完成构建、启动，并在源码修改时重建 client bundle；`make help` 列出 Web 与 Desktop 对应的 Make target。完整表格见开发指南的「应用命令」一节。
 
+### 本地打包 Desktop App（macOS arm64）
+
+```sh
+pnpm install
+ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/ \
+  pnpm run package:desktop:mac:arm64:unsigned
+```
+
+产物位于 `apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/`：可直接运行的 `mac-arm64/DeepSeek Harness.app`，以及 `deepseek-harness-<版本>-mac-arm64-unsigned.dmg`。这是本地未签名（ad-hoc）构建，拖入「应用程序」或用 `ditto` 复制即可运行。
+
+编译用到的镜像源与代理：Electron 默认从 GitHub 下载，国内建议设置 `ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/`（也可写入 `~/.npmrc` 的 `electron_mirror=...`）；zip 会缓存在 `apps/desktop/.desktop-build/downloads/`，同一版本不会重复下载。npm 使用 `~/.npmrc` 中的 `registry=https://registry.npmmirror.com/`。GitHub 直连超时可 `export https_proxy=http://127.0.0.1:1080 http_proxy=http://127.0.0.1:1080 all_proxy=socks5://127.0.0.1:1080`；`@electron/get` 需要同时设置 `ELECTRON_GET_USE_PROXY=true` 才会读取这些代理变量。
+
+Electron 版本由仓库锁定（当前 44.7.0），并非越新越好：升级会同时更换 Chromium/Node，需要重装依赖、重新打包，并回归原生模块（pty、sandbox、图片、addon）与镜像可用性后再合入。
+
 面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
 
 ## 引用
