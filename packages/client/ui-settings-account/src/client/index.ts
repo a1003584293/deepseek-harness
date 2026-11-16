@@ -32,6 +32,7 @@ import { DesktopOnboardingEntry, type DesktopOnboardingInjected } from './Deskto
 import { readOnboardingApiKeyPresence } from './onboarding-credentials.ts'
 import { refreshAfterReturn } from './account-refresh.ts'
 import { AccountAvatarLoader } from './account-avatar.ts'
+import { watchTurnEnds } from './turn-refresh.ts'
 export type { AccountSectionInjected, AccountSectionProps } from './AccountSection.tsx'
 export type { AccountMenuProps } from './AccountMenu.tsx'
 export type { AccountSnapshot } from './AccountSection.tsx'
@@ -113,22 +114,9 @@ export function apply(ctx: Context): void {
       },
     })
     let accountGeneration = 0
-    // Re-read profile and balance after each top-level turn ends, so account
-    // details follow the usage the turn consumed. Subagent turns belong to
-    // their parent turn.
-    let running = new Map<string, boolean>()
-    const stopTurnWatch = ctx.sessions.list.subscribe(() => {
-      const { byId } = ctx.sessions.list.getSnapshot()
-      const previous = running
-      const next = new Map<string, boolean>()
-      let finished = false
-      for (const summary of Object.values(byId)) {
-        next.set(summary.id, summary.running)
-        if (previous.get(summary.id) === true && !summary.running && summary.origin !== 'subagent') finished = true
-      }
-      running = next
-      if (finished) void refresh()
-    })
+    // Profile and balance follow the usage each top-level turn consumed, including
+    // the platform's delayed settlement of that usage.
+    const stopTurnWatch = watchTurnEnds(ctx.sessions.list, () => { void refresh() })
     // Read across closures: the disposer ends this grant while the frame loop awaits.
     const grant = { ended: false }
     // Revocation clears shared account state before another access grant can start.
