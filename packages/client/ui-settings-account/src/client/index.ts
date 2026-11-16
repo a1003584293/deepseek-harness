@@ -34,6 +34,7 @@ import { readOnboardingApiKeyPresence } from './onboarding-credentials.ts'
 import { refreshAfterReturn } from './account-refresh.ts'
 import { AccountAvatarLoader } from './account-avatar.ts'
 import { balanceTextOf, displayNameOf } from './account-display.ts'
+import { pollBalance } from './balance-poll.ts'
 import { watchTurnEnds } from './turn-refresh.ts'
 export type { AccountSectionInjected, AccountSectionProps } from './AccountSection.tsx'
 export type { AccountMenuProps } from './AccountMenu.tsx'
@@ -129,11 +130,15 @@ export function apply(ctx: Context): void {
     // Profile and balance follow the usage each top-level turn consumed, including
     // the platform's delayed settlement of that usage.
     const stopTurnWatch = watchTurnEnds(ctx.sessions.list, () => { void refresh() })
+    // Another device may spend this account, and a long turn may outlast the one
+    // read its end schedules; keep reading while the grant lives.
+    const stopBalancePoll = pollBalance(ctx.sessions.list, () => { void refresh() })
     // Read across closures: the disposer ends this grant while the frame loop awaits.
     const grant = { ended: false }
     // Revocation clears shared account state before another access grant can start.
     yield () => {
       stopTurnWatch()
+      stopBalancePoll()
       grant.ended = true
       revision++
       refreshing = undefined
