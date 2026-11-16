@@ -79,6 +79,15 @@ export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'r
  * chip title.
  * @param ctx - client root context carrying the registry, the slots, and the Remote face.
  */
+/** The two account display facts the editor status line renders. */
+interface AccountDisplay {
+  getSnapshot(): {
+    readonly displayName?: string | undefined
+    readonly balanceText?: string | undefined
+  }
+  subscribe(listener: () => void): () => void
+}
+
 export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   const handle = createFilesStore()
@@ -89,36 +98,19 @@ export function apply(ctx: ClientContext): void {
   const editorPaths = createSnapshotStore<Record<string, string>>({}, { persist: { name: 'sidebarEditorPaths' } })
   const accountName = createSnapshotStore<string | undefined>(undefined)
   const accountBalance = createSnapshotStore<string | undefined>(undefined)
-  // The account plugin owns profile reads; mirror only its display name for
-  // the editor status line, including profile after view, balance, and avatar updates.
+  // The account plugin owns the profile and balance presentation; the status
+  // line renders its display text unchanged so cents truncate exactly as the
+  // Account settings rows do. The account package cannot be a type dependency
+  // here: it reaches this package through the Chat and preview project chain.
   ctx.inject(['accountUi'], (accountCtx) => {
-    type Wallet = { readonly currency: 'CNY' | 'USD'; readonly balance: string }
-    type AccountState = {
-      details?: {
-        profile?: { status?: string; value?: { name?: string } }
-        balance?: { status?: string; value?: readonly Wallet[] }
-      }
-    }
-    const account = accountCtx.get('accountUi') as unknown as {
-      getSnapshot(): AccountState
-      subscribe(listener: () => void): () => void
-    }
+    const account = accountCtx.get('accountUi') as AccountDisplay
     const sync = (): void => {
-      const details = account.getSnapshot().details
-      const profile = details?.profile
-      accountName.set(profile?.status === 'ready' ? profile.value?.name : undefined)
-      const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
-      accountBalance.set(wallets === undefined || wallets.length === 0 ? undefined
-        : wallets.map((wallet) => {
-          const symbol = wallet.currency === 'CNY' ? '¥' : '$'
-          const value = Number(wallet.balance)
-          return Number.isFinite(value)
-            ? symbol + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : symbol + wallet.balance
-        }).join(' '))
+      const state = account.getSnapshot()
+      accountName.set(state.displayName)
+      accountBalance.set(state.balanceText)
     }
     sync()
-    accountCtx.effect(() => account.subscribe(sync), 'ui-sidebar-files: account name')
+    accountCtx.effect(() => account.subscribe(sync), 'ui-sidebar-files: account status')
   })
   const workspaceSearch = createSearch(ctx.remote)
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {

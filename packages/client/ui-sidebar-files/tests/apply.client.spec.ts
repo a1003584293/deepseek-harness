@@ -17,6 +17,7 @@ import type { PaneId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { FILES_ID, FILES_KIND } from '../src/client/definition.tsx'
 import type { FilesInjected } from '../src/client/face.ts'
+import type { EditorInjected } from '../src/client/EditorBody.tsx'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
 import { FileTree } from '../src/client/FileTree.tsx'
@@ -101,9 +102,28 @@ async function boot() {
   ctx.provide('remote', { workspaceFiles, gitPanel, $host: { home: HOME, isLoopback: true } } as never)
   ctx.provide('remote.workspaceFiles', workspaceFiles as never)
   ctx.provide('remote.gitPanel', gitPanel as never)
+  // The account plugin owns balance presentation; the status line only renders it.
+  const accountDisplay: { displayName: string | undefined; balanceText: string | undefined } = {
+    displayName: 'User', balanceText: '¥2.33',
+  }
+  const accountListeners = new Set<() => void>()
+  ctx.provide('accountUi', {
+    getSnapshot: () => ({ view: undefined, failed: false, ...accountDisplay }),
+    subscribe: (listener: () => void) => {
+      accountListeners.add(listener)
+      return () => { accountListeners.delete(listener) }
+    },
+    clientMetadata: () => ({ version: '0.0.0-test', locale: 'en', timezone: 'UTC' }),
+  } as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { ctx, tabs, registered, dictionaries, fiber, sidebar, commands, slots, navigation, source, workspaceFiles }
+  return {
+    ctx, tabs, registered, dictionaries, fiber, sidebar, commands, slots, navigation, source, workspaceFiles,
+    setAccount(next: Partial<typeof accountDisplay>) {
+      Object.assign(accountDisplay, next)
+      for (const listener of [...accountListeners]) listener()
+    },
+  }
 }
 
 /** Run the files command for one target. */
@@ -115,6 +135,19 @@ function run(h: Awaited<ReturnType<typeof boot>>, target: object): void {
 }
 
 describe('ui-sidebar-files apply', () => {
+  it('renders the account plugin display facts in the editor status hooks unchanged', async () => {
+    const h = await boot()
+    try {
+      const page = h.registered.find(entry => entry.name === 'sidebar.right.pane.tab' && entry.key === EDITOR_ID)!
+      const face = page.inject!(SESSION, {}) as EditorInjected
+      expect(face.hooks.accountName.getSnapshot()).toBe('User')
+      expect(face.hooks.accountBalance.getSnapshot()).toBe('¥2.33')
+      h.setAccount({ displayName: 'Other', balanceText: '¥1,234.56 <$0.01' })
+      expect(face.hooks.accountName.getSnapshot()).toBe('Other')
+      expect(face.hooks.accountBalance.getSnapshot()).toBe('¥1,234.56 <$0.01')
+    } finally { await h.fiber.dispose() }
+  })
+
   it('opens files for the command target and refuses without a selected Session', async () => {
     const h = await boot()
     try {

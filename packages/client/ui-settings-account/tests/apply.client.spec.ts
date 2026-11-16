@@ -16,6 +16,7 @@ import { ChatSettingsSchema as ChatConfig } from '../../ui-chat/src/chat-setting
 import { DeveloperToolsSettingsSchema as SettingsConfig } from '../../ui-settings/src/developer-tools-settings.ts'
 import type { DesktopOnboardingInjected } from '../src/client/DesktopOnboardingEntry.tsx'
 import type { AccountSectionInjected } from '../src/client/AccountSection.tsx'
+import type {} from '../src/client/account-ui.ts'
 import { CONTACT_CONFIG_GLOBAL } from '../src/contact-config.ts'
 import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import type { AccountPlatformHostInjected } from '../src/client/AccountPlatformHost.tsx'
@@ -314,6 +315,27 @@ it('re-reads the account when a top-level turn ends and ignores subagent turns',
   })
   await c.flush()
   expect(c.mock.remote.account.getBalance).toHaveBeenCalledTimes(2)
+}, 60_000)
+
+it('publishes display-ready account facts so plugins never reformat cents', async ({ start }) => {
+  vi.stubGlobal('dshDesktop', {})
+  const c = await start()
+  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
+  c.mock.remote.account.getBalance.mockResolvedValue(ok({
+    status: 'ready',
+    // Sub-cent precision on the wire: the shared presentation truncates it.
+    value: [{ currency: 'CNY', balance: '2.335' }],
+    bonusWallets: [{ currency: 'CNY', balance: '9.99' }],
+  }))
+  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
+  await vi.waitFor(() => {
+    expect(c.ctx.accountUi.getSnapshot()).toMatchObject({ displayName: 'User', balanceText: '¥2.33' })
+  })
+  // Sign-out clears the display text with the details it came from.
+  c.mock.streams.push('account/watch', { type: 'snapshot', state: view })
+  await vi.waitFor(() => {
+    expect(c.ctx.accountUi.getSnapshot()).toMatchObject({ displayName: undefined, balanceText: undefined })
+  })
 }, 60_000)
 
 it('coalesces refreshes, publishes independent failures, and rejects stale responses after sign-out or unload', async ({ start }) => {

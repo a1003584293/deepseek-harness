@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-api-remote-access/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { AccountUpdate, AccountDetails } from '@deepseek-ai/dsh-deepseek-account/types'
+import type { AccountUiState } from './account-ui.ts'
 import type { OnboardingChange } from './onboarding-contract.ts'
 import type { PlatformBridge } from './PlatformOverlay.tsx'
 import { ContactConfig, CONTACT_CONFIG_GLOBAL } from '../contact-config.ts'
@@ -32,6 +33,7 @@ import { DesktopOnboardingEntry, type DesktopOnboardingInjected } from './Deskto
 import { readOnboardingApiKeyPresence } from './onboarding-credentials.ts'
 import { refreshAfterReturn } from './account-refresh.ts'
 import { AccountAvatarLoader } from './account-avatar.ts'
+import { balanceTextOf, displayNameOf } from './account-display.ts'
 import { watchTurnEnds } from './turn-refresh.ts'
 export type { AccountSectionInjected, AccountSectionProps } from './AccountSection.tsx'
 export type { AccountMenuProps } from './AccountMenu.tsx'
@@ -55,17 +57,27 @@ export function apply(ctx: Context): void {
   let snapshot: AccountSnapshot = {
     view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false, desktopOnboardingVisible: desktop,
   }
+  // The public projection adds display text, so a client surface renders the
+  // same cents as the Account settings rows instead of formatting a raw balance.
+  let uiState: AccountUiState = { view: undefined, failed: false, displayName: undefined, balanceText: undefined }
   // Desktop main opens the authorization page natively; a plain browser opens it in a tab it owns.
   const browser = new BrowserLogin(url => authorizeUrlWithTheme(url, ctx.theme.getTheme().active.colorScheme))
   ctx.effect(() => () => { browser.dispose() }, 'account: pending browser window')
   const listeners = new Set<() => void>()
-  const publish = (value: AccountSnapshot) => { snapshot = value; for (const listener of listeners) listener() }
+  const publish = (value: AccountSnapshot) => {
+    snapshot = value
+    uiState = {
+      view: value.view, failed: value.failed,
+      displayName: displayNameOf(value.details), balanceText: balanceTextOf(value.details),
+    }
+    for (const listener of listeners) listener()
+  }
   const avatar = new AccountAvatarLoader((value) => { publish({ ...snapshot, avatar: value }) })
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
   ctx.provide('accountUi', {
-    getSnapshot: () => snapshot,
+    getSnapshot: () => uiState,
     subscribe: (listener: () => void) => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
@@ -110,7 +122,7 @@ export function apply(ctx: Context): void {
       name: 'account', open: signal => ctx.remote.account.watch(signal), ended: () => new Error('account stream ended'),
       carrierFailed: () => {
         publish({ ...snapshot, failed: true })
-        ctx.emit('account-ui/change', snapshot, true)
+        ctx.emit('account-ui/change', uiState, true)
       },
     })
     let accountGeneration = 0
@@ -129,7 +141,7 @@ export function apply(ctx: Context): void {
       browser.dispose()
       const { loginFailed: _loginFailed, ...current } = snapshot
       publish({ ...current, view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false })
-      ctx.emit('account-ui/change', snapshot, true)
+      ctx.emit('account-ui/change', uiState, true)
       return stream.dispose()
     }
     void (async () => {
@@ -149,7 +161,7 @@ export function apply(ctx: Context): void {
         publish({ ...snapshot, view, details: undefined, avatar: undefined, failed: false })
         browser.update(view)
         frame.accept()
-        ctx.emit('account-ui/change', snapshot, reset)
+        ctx.emit('account-ui/change', uiState, reset)
         if (initialize) void (async () => {
           try {
             const initialized = await ctx.remote.session.initializeDefaultModel()
@@ -163,7 +175,7 @@ export function apply(ctx: Context): void {
     })().catch(() => {
       if (!grant.ended) {
         publish({ ...snapshot, failed: true })
-        ctx.emit('account-ui/change', snapshot, true)
+        ctx.emit('account-ui/change', uiState, true)
       }
     })
   })

@@ -1,10 +1,14 @@
 /** Account state and presentation extension points shared with client plugins. */
 import type { AccountClientMetadata, AccountView } from '@deepseek-ai/dsh-deepseek-account/types'
 
-/** Latest account-stream availability, without notification state. */
+/** Latest account-stream availability and display-ready account facts, without notification state. */
 export interface AccountUiState {
   readonly view: AccountView | undefined
   readonly failed: boolean
+  /** Signed-in profile name, once the profile read is ready. */
+  readonly displayName: string | undefined
+  /** Recharge balance text formatted exactly like the Account settings rows; absent while loading, unavailable, or empty. */
+  readonly balanceText: string | undefined
 }
 
 /** Read the account stream already owned by the account settings plugin. */

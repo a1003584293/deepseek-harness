@@ -36,7 +36,7 @@ The section registers through settings.section and uses the account Remote names
 
 Account operations carry this UI's client identity to the Host: build version, active language, and the current UTC offset in seconds sampled as the operation is issued.
 
-Balances use Platform Web currency formatting: two decimal places and digit grouping, positive amounts truncated to cents, positive sub-cent amounts shown as <0.01, and negative amounts rounded with a minimum displayed magnitude of 0.01. Raw Host balance strings remain unchanged.
+Balances use Platform Web currency formatting: two decimal places and digit grouping, positive amounts truncated to cents, positive sub-cent amounts shown as <0.01, and negative amounts rounded with a minimum displayed magnitude of 0.01. Raw Host balance strings remain unchanged. The account UI state also publishes the display-ready profile name and recharge balance text under these rules, so a client surface such as the editor status line renders that text instead of reformatting a raw balance.
 
 The plugin reads profile and balance once after each top-level Session turn ends, then once more 20 seconds later so usage the platform settles after the turn still reaches the editor status line. A later turn restarts the pending follow-up instead of queueing one read per turn. Subagent turns read nothing.
 
