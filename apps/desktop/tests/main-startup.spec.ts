@@ -105,6 +105,7 @@ const harness = await vi.hoisted(async () => {
     readonly moveTop = vi.fn()
     readonly setAlwaysOnTop = vi.fn()
     readonly restore = vi.fn()
+    readonly setVisibleOnAllWorkspaces = vi.fn()
     readonly setSize = vi.fn()
     readonly getBounds = vi.fn(() => ({ x: 0, y: 0, width: 800, height: 700 }))
     readonly setMinimumSize = vi.fn()
@@ -1776,8 +1777,14 @@ describe('desktop main startup', () => {
     expect(window.hide).toHaveBeenCalledOnce()
     expect(harness.backgroundNotice.close).not.toHaveBeenCalled()
     window.show.mockClear()
+    // A hidden window joins every Space for this show, so Dock activation lands
+    // on the Space the person is on, then the all-workspaces set is cleared.
+    window.visible = false
     harness.app.emit('activate', {}, false)
+    expect(window.setVisibleOnAllWorkspaces).toHaveBeenNthCalledWith(1, true, { skipTransformProcessType: true })
     expect(window.show).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(window.setVisibleOnAllWorkspaces).toHaveBeenLastCalledWith(false, { skipTransformProcessType: true })
     harness.app.emit('activate', {}, true)
     expect(window.show).toHaveBeenCalledOnce()
   })

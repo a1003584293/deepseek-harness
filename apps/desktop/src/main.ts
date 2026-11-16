@@ -1310,6 +1310,29 @@ async function main(): Promise<void> {
     })
   }
 
+  /** Time the window needs to join the active macOS Space before leaving the all-workspaces set. */
+  const ACTIVE_SPACE_SETTLE_MS = 100
+  /**
+   * Reveal a hidden window on the Space where the app was activated. AppKit
+   * otherwise returns the window to the Space that owned it; joining every
+   * Space for this show moves it to the active one, and the set is cleared once
+   * the window has joined.
+   * @param window - the product or welcome window to reveal.
+   */
+  const revealPrimaryWindow = (window: BrowserWindow): void => {
+    const hidden = !window.isVisible() || window.isMinimized()
+    if (process.platform !== 'darwin' || !hidden) {
+      if (window.isMinimized()) window.restore()
+      window.show()
+      return
+    }
+    window.setVisibleOnAllWorkspaces(true, { skipTransformProcessType: true })
+    if (window.isMinimized()) window.restore()
+    window.show()
+    setTimeout(() => {
+      if (!window.isDestroyed()) window.setVisibleOnAllWorkspaces(false, { skipTransformProcessType: true })
+    }, ACTIVE_SPACE_SETTLE_MS)
+  }
   const hideMainWindow = (window: BrowserWindow): void => {
     if (process.platform === 'darwin' && window.isFullScreen()) {
       // Hiding a fullscreen window leaves an empty black space; leave fullscreen first.
@@ -1480,8 +1503,7 @@ async function main(): Promise<void> {
     }
     // Startup and sign-out select the visible window before activation may reveal the workspace.
     if (window === mainWindow && !enteredWorkspace) return
-    if (window.isMinimized()) window.restore()
-    window.show()
+    revealPrimaryWindow(window)
     window.focus()
   }
 
