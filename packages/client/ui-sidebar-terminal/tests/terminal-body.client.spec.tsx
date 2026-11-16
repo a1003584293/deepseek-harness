@@ -29,6 +29,7 @@ class FakeTerminal {
     return { dispose: this.disposeRender }
   })
   readonly resize = vi.fn()
+  readonly clear = vi.fn()
   readonly reset = vi.fn()
   readonly focus = vi.fn()
   readonly dispose = vi.fn()
@@ -69,7 +70,7 @@ const titleSurfaces = [
     wrap: (title: ReactNode) => <header data-dockkit-float-grip="pane"><div data-dockkit-float-title><span>{title}</span></div></header>,
   },
 ]
-function mount(initial: TerminalViewState | undefined = idle, dictionary = en) {
+function mount(initial: TerminalViewState | undefined = idle, dictionary = en, platform: 'macos' | 'windows' = 'macos') {
   let state: TerminalViewState | undefined = initial
   let visible = true
   let theme: ThemeSnapshot = {
@@ -91,6 +92,7 @@ function mount(initial: TerminalViewState | undefined = idle, dictionary = en) {
     useTabInfo: tab, t: makeTranslate(dictionary),
     openSelectionMenu: vi.fn(),
     registerSelectionReader: vi.fn(() => () => {}),
+    platform,
   } as unknown as TerminalBodyProps
   const view = render(<TerminalBody {...props} />)
   return {
@@ -163,6 +165,30 @@ it('keeps one emulator across rename and locale updates, applies snapshots and o
   expect(terminal.dispose).toHaveBeenCalledOnce()
   expect(terminal.disposeInput).toHaveBeenCalledOnce()
   expect(disconnect).toHaveBeenCalledOnce()
+})
+
+it.each([
+  ['macos', 'metaKey', 'ctrlKey'],
+  ['windows', 'ctrlKey', 'metaKey'],
+] as const)('clears locally and at the shell only for the %s primary clear gesture', (platform, primary, secondary) => {
+  const h = mount({ ...idle, info, phase: 'connected', writable: true }, en, platform)
+  const terminal = fake.terminals[0]!
+  const textarea = terminal.textarea!
+
+  fireEvent.keyDown(textarea, { key: 'k', [primary]: true })
+  expect(terminal.clear).toHaveBeenCalledOnce()
+  expect(h.model.write).toHaveBeenLastCalledWith('\x0c', true)
+  // The other modifier keeps its shell meaning (readline kill-line on macOS).
+  fireEvent.keyDown(textarea, { key: 'k', [secondary]: true })
+  expect(terminal.clear).toHaveBeenCalledOnce()
+  // Modified or unrelated gestures reach the emulator untouched.
+  for (const gesture of [{ key: 'k', [primary]: true, shiftKey: true }, { key: 'k', [primary]: true, altKey: true }, { key: 'j', [primary]: true }]) {
+    fireEvent.keyDown(textarea, gesture)
+  }
+  expect(terminal.clear).toHaveBeenCalledOnce()
+  fireEvent.keyDown(textarea, { key: 'l', [primary]: true })
+  expect(terminal.clear).toHaveBeenCalledTimes(2)
+  h.view.unmount()
 })
 
 it('marks emulator input as typed only shortly after a person gesture, never for focus reports or scrolling', () => {

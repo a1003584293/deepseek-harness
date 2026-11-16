@@ -94,14 +94,56 @@
   overflow: hidden;
 }
 
-.body > section {
+.occurrence {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+.note,
+.status,
+.error {
+  flex: none;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.note,
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .note {
-  margin: 0;
-  padding: 10px;
   color: var(--dsw-alias-label-tertiary);
+}
+
+.status {
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-l2);
+}
+
+.error {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-l2);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  color: var(--dsw-alias-label-primary);
   font-size: 12px;
+  background: var(--dsw-alias-bg-l3, var(--dsw-alias-bg-l2));
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
 }

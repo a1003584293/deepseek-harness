@@ -159,6 +159,7 @@ export function apply(ctx: Context): void {
       selectionReaders.set(key, read)
       return () => { if (selectionReaders.get(key) === read) selectionReaders.delete(key) }
     },
+    platform: ctx.shortcuts.platform,
   })
   const theme: TerminalBodyInjected['hooks']['theme'] = {
     getSnapshot: () => ctx.theme.getTheme(),
@@ -175,6 +176,7 @@ export function apply(ctx: Context): void {
       closeView: (sessionId, key, contentId, id) => { ctx.webTerminals.close(sessionId, key, contentId, id) },
       retain: (tabs) => { bottomTabs.set(tabs) },
       setHeight: (value) => { bottomHeight.set(value) },
+      platform: ctx.shortcuts.platform,
     }),
   }, BottomTerminal)), 'ui-sidebar-terminal: bottom dock')
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.guide.entry', () => ctx.slots.register({

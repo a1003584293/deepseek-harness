@@ -3,6 +3,7 @@ import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/typ
 import type { TerminalView, TerminalViewState } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { ShortcutPlatform } from '@deepseek-ai/dsh-client-shortcuts/client'
 
 /** The terminal's React-free model is resolved by sidebar occurrence. */
 export interface TerminalInjected {
@@ -23,6 +24,8 @@ export interface TerminalInjected {
    */
   readonly registerSelectionReader: (key: string, read: () => { readonly text: string; readonly cwd?: string } | undefined) => () => void
   readonly keyedHooks: { readonly terminal: (key: string) => HostObservable<TerminalViewState> }
+  /** Keyboard platform deciding which modifier clears a screen. */
+  readonly platform: ShortcutPlatform
 }
 
 

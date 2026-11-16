@@ -1,7 +1,8 @@
 /** Sidebar terminal screen and connection recovery. */
 import {
   useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore,
-  type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
+  type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent, type ReactNode,
 } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -11,6 +12,7 @@ import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@dee
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { ShortcutPlatform } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { TerminalBodyInjected } from './face.ts'
 import type {} from './locales.ts'
 import '@xterm/xterm/css/xterm.css'
@@ -22,13 +24,44 @@ import { observeTerminalCursor } from './terminal-cursor.ts'
 /** Standard sidebar owner share plus terminal model and localized copy. */
 export type TerminalBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarTerminal'> & InjectFace<TerminalBodyInjected>
 
+/** Copy seat shared by the terminal surfaces. */
+type TerminalCopy = PropsLocale<'sidebarTerminal'>['t']
+
+/**
+ * Presentable facts of one view, shared by the sidebar terminal and the bottom dock.
+ * @param state - the view's observable state.
+ * @param t - localized terminal copy.
+ * @returns status line text, visible failure, and the one recovery each state offers.
+ */
+function terminalStatus(state: TerminalViewState, t: TerminalCopy): {
+  status: string | undefined
+  error: string | undefined
+  ended: boolean
+  retry: boolean
+  readOnly: boolean
+} {
+  const error = state.phase === 'disconnected' ? undefined : state.issue === undefined ? state.error ?? state.info?.error : t(state.issue)
+  let status: string | undefined
+  if (state.phase === 'idle' || state.phase === 'loading') status = t('loading')
+  else if (state.phase === 'creating' || state.phase === 'connecting' || state.phase === 'disconnected') status = t(state.phase)
+  else if (state.info?.state === 'exited') status = t('exited', { code: String(state.info.exitCode ?? '—') })
+  else if (state.info?.state === 'failed') status = t('unavailable')
+  else if (state.phase === 'closed') status = t('closed')
+  const ended = state.info?.state === 'exited' || state.phase === 'closed'
+  return {
+    status, error, ended,
+    retry: !ended && (state.phase === 'failed' || state.phase === 'disconnected'),
+    readOnly: state.phase === 'connected' && state.info?.state === 'running' && !state.writable,
+  }
+}
+
 /**
  * Render the retained terminal with the application theme.
  * @param props - sidebar occurrence, model lookup and translated copy.
  * @returns the terminal screen and any pending or exceptional state.
  */
 export function TerminalBody({
-  useTabInfo, useTerminal, useTheme, view, openSelectionMenu, registerSelectionReader, t,
+  useTabInfo, useTerminal, useTheme, view, openSelectionMenu, registerSelectionReader, platform, t,
 }: TerminalBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const theme = useTheme(value => value)
@@ -51,16 +84,7 @@ export function TerminalBody({
       {newTerminal}
     </div>
   </section>
-  const error = state.phase === 'disconnected' ? undefined : state.issue === undefined ? state.error ?? state.info?.error : t(state.issue)
-  let status: string | undefined
-  if (state.phase === 'idle' || state.phase === 'loading') status = t('loading')
-  else if (state.phase === 'creating' || state.phase === 'connecting' || state.phase === 'disconnected') status = t(state.phase)
-  else if (state.info?.state === 'exited') status = t('exited', { code: String(state.info.exitCode ?? '—') })
-  else if (state.info?.state === 'failed') status = t('unavailable')
-  else if (state.phase === 'closed') status = t('closed')
-  const ended = state.info?.state === 'exited' || state.phase === 'closed'
-  const retry = !ended && (state.phase === 'failed' || state.phase === 'disconnected')
-  const readOnly = state.phase === 'connected' && state.info?.state === 'running' && !state.writable
+  const { status, error, ended, retry, readOnly } = terminalStatus(state, t)
   return (
     <section className={css.root} data-sidebar-terminal>
       {(status !== undefined || retry || readOnly) && <div className={css.status} role="status">
@@ -73,7 +97,7 @@ export function TerminalBody({
       </div>}
       {state.info !== undefined && <TerminalScreen state={state} model={model} tabKey={tab.id} visible={tab.visible} label={t('title')} theme={theme}
         cwd={state.environment?.cwd} openSelectionMenu={openSelectionMenu}
-        registerSelectionReader={registerSelectionReader} />}
+        registerSelectionReader={registerSelectionReader} platform={platform} />}
       {error !== undefined && <p className={css.error} role="alert">{t('failed', { message: error })}</p>}
     </section>
   )
@@ -90,7 +114,7 @@ const INPUT_GESTURES = ['keydown', 'beforeinput', 'paste', 'compositionend', 'dr
 const FOCUS_REPORTS = new Set(['\x1b[I', '\x1b[O'])
 
 /* oxlint-disable typescript/no-non-null-assertion -- React sets the DOM ref, then these effects initialize and use the emulator. */
-export function TerminalScreen({ state, model, tabKey, visible, label, theme, cwd, openSelectionMenu, registerSelectionReader }: {
+export function TerminalScreen({ state, model, tabKey, visible, label, theme, cwd, openSelectionMenu, registerSelectionReader, platform }: {
   state: TerminalViewState
   model: TerminalView
   tabKey: string
@@ -100,6 +124,7 @@ export function TerminalScreen({ state, model, tabKey, visible, label, theme, cw
   cwd: string | undefined
   openSelectionMenu: TerminalBodyInjected['openSelectionMenu']
   registerSelectionReader: TerminalBodyInjected['registerSelectionReader']
+  platform: ShortcutPlatform
 }): ReactNode {
   const element = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal>()
@@ -205,7 +230,17 @@ export function TerminalScreen({ state, model, tabKey, visible, label, theme, cw
     event.preventDefault()
     openSelectionMenu(text, cwd, { x: event.clientX, y: event.clientY })
   }
-  return <div className={css.screen} ref={element} onContextMenu={selectionMenu} />
+  // Clear locally before asking the shell, so a program that ignores the key
+  // still leaves an empty view.
+  const clearGesture = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const primary = platform === 'macos' ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+    if (!primary || event.altKey || event.shiftKey || (event.key !== 'k' && event.key !== 'l')) return
+    event.preventDefault()
+    event.stopPropagation()
+    terminal.current?.clear()
+    model.write('\x0c', true)
+  }
+  return <div className={css.screen} ref={element} onContextMenu={selectionMenu} onKeyDownCapture={clearGesture} />
 }
 /* oxlint-enable typescript/no-non-null-assertion */
 
@@ -226,11 +261,11 @@ function fitScreen(xterm: Terminal, fit: FitAddon, state: TerminalViewState, mod
   xterm.resize(cols, rows)
   model.resize(cols, rows)
 }
-/** One terminal tab in the bottom dock. */
+/** One terminal tab in the bottom dock, owned by the Session it was opened for. */
 interface BottomTab {
+  readonly sessionId: SessionId
   readonly key: string
   readonly contentId: string
-  readonly title: string
 }
 
 /** Services and observable state the bottom dock needs. */
@@ -245,15 +280,17 @@ export interface BottomTerminalInjected {
   readonly closeView: (sessionId: SessionId, key: string, contentId: string, id?: WebTerminalId) => void
   readonly retain: (tabs: readonly { sessionId: SessionId; tabId: string; contentId: string }[]) => void
   readonly setHeight: (height: number) => void
+  /** Keyboard platform that decides which modifier clears a screen. */
+  readonly platform: ShortcutPlatform
 }
 
 /** Root slot props plus the bottom dock services and copy. */
 export type BottomTerminalProps = PropsRuntime<'shell.bottom'> & PropsLocale<'sidebarTerminal'> & InjectFace<BottomTerminalInjected>
 
-/** Subscribe one terminal model, tolerating the moment before a tab exists. */
-function useTerminalState(model: TerminalView | undefined): TerminalViewState | undefined {
-  const subscribe = useCallback((listener: () => void) => model?.state.subscribe(listener) ?? (() => {}), [model])
-  return useSyncExternalStore(subscribe, () => model?.state.getSnapshot(), () => model?.state.getSnapshot())
+/** Subscribe one terminal model. */
+function useTerminalState(model: TerminalView): TerminalViewState {
+  const subscribe = useCallback((listener: () => void) => model.state.subscribe(listener), [model])
+  return useSyncExternalStore(subscribe, () => model.state.getSnapshot(), () => model.state.getSnapshot())
 }
 
 /** Content identity for one bottom tab; stable across remounts. */
@@ -267,13 +304,82 @@ function contentIdOf(sessionId: SessionId, key: string): string {
   return 'dsh-bottom-terminal:' + sessionId + ':' + key + ':' + String(bottomSequence) + ':' + Date.now().toString(36)
 }
 
+/** Empty selection hooks: the bottom dock offers neither the menu nor the pin gesture. */
+const noSelectionMenu: TerminalBodyInjected['openSelectionMenu'] = () => {}
+const noSelectionReader: TerminalBodyInjected['registerSelectionReader'] = () => () => {}
+
+/**
+ * One bottom occurrence. Its emulator stays mounted while the dock is hidden or
+ * another tab is active, so switching never replays a stale frame or regains
+ * input control from a missing attachment.
+ */
+function BottomTabScreen({ sessionId, tab, active, view, theme, platform, t, onNew }: {
+  sessionId: SessionId
+  tab: BottomTab
+  active: boolean
+  view: BottomTerminalInjected['view']
+  theme: ThemeSnapshot
+  platform: ShortcutPlatform
+  t: TerminalCopy
+  onNew: () => void
+}): ReactNode {
+  const model = view(sessionId, tab.key, tab.contentId)
+  const state = useTerminalState(model)
+  useEffect(() => model.mount(), [model])
+  const { status, error, ended, retry, readOnly } = terminalStatus(state, t)
+  const note = state.info !== undefined ? undefined
+    : state.issue !== undefined ? t(state.issue)
+      : state.error ?? (state.phase === 'creating' ? t('creating') : state.phase === 'connecting' ? t('connecting') : t('loading'))
+  return (
+    <div className={bottomCss.occurrence} data-active={active || undefined} style={active ? undefined : { display: 'none' }}>
+      {note === undefined ? null : <div className={bottomCss.note}>
+        <span>{note}</span>
+        {state.issue === 'missingTerminal' ? <button type="button" className={bottomCss.action} onClick={onNew}>{t('new')}</button> : null}
+      </div>}
+      {(status !== undefined || retry || readOnly || ended) && <div className={bottomCss.status} role="status">
+        {status}
+        {readOnly && <>{t('readonly')} <button type="button" className={bottomCss.action} onClick={() => { model.connect() }}>{t('control')}</button></>}
+        {retry && (state.info === undefined
+          ? <button type="button" className={bottomCss.action} onClick={() => { void model.refresh() }}>{t(state.phase === 'disconnected' ? 'reconnect' : 'retry')}</button>
+          : <button type="button" className={bottomCss.action} onClick={() => { model.connect() }}>{t('reconnect')}</button>)}
+        {ended && <button type="button" className={bottomCss.action} onClick={onNew}>{t('new')}</button>}
+      </div>}
+      {error === undefined ? null : <p className={bottomCss.error} role="alert">{t('failed', { message: error })}</p>}
+      {state.info === undefined ? null : <TerminalScreen state={state} model={model} tabKey={tab.key} visible={active} label={t('title')} theme={theme}
+        cwd={state.environment?.cwd} openSelectionMenu={noSelectionMenu} registerSelectionReader={noSelectionReader} platform={platform} />}
+    </div>
+  )
+}
+
+/** One dock tab chip; its title follows the terminal's saved rename, then its Host name. */
+function BottomTabChip({ sessionId, tab, active, view, onSelect, onClose, t }: {
+  sessionId: SessionId
+  tab: BottomTab
+  active: boolean
+  view: BottomTerminalInjected['view']
+  onSelect: () => void
+  onClose: () => void
+  t: TerminalCopy
+}): ReactNode {
+  const state = useTerminalState(view(sessionId, tab.key, tab.contentId))
+  const title = state.title ?? state.info?.title ?? t('title')
+  return (
+    <div className={bottomCss.tab} data-active={active || undefined}>
+      <button type="button" className={bottomCss.tabButton} onClick={onSelect}>
+        <span className={bottomCss.prompt} aria-hidden="true">{'>_'}</span>{title}
+      </button>
+      <button type="button" className={bottomCss.closeTab} aria-label={t('close')} title={t('close')} onClick={onClose}>×</button>
+    </div>
+  )
+}
+
 /**
  * Render the bottom terminal dock.
  * @param props - the active Session, theme, open/height stores, and terminal model access.
- * @returns the panel, or nothing while it is closed or has no Session.
+ * @returns the dock panel, hidden while it is closed or without a Session.
  */
 export function BottomTerminal({
-  useActiveSession, useTheme, useOpen, useHeight, view, closeView, retain, setHeight, t,
+  useActiveSession, useTheme, useOpen, useHeight, view, closeView, retain, setHeight, platform, t,
 }: BottomTerminalProps): ReactNode {
   const sessionId = useActiveSession(value => value)
   const theme = useTheme(value => value)
@@ -282,63 +388,85 @@ export function BottomTerminal({
   const [tabs, setTabs] = useState<readonly BottomTab[]>([])
   const [activeKey, setActiveKey] = useState<string>()
   const next = useRef(1)
+  const owningSession = useRef<SessionId | undefined>(undefined)
+  const liveTabs = useRef<readonly BottomTab[]>(tabs)
+  liveTabs.current = tabs
   const retainRef = useRef(retain)
   retainRef.current = retain
-  const active = tabs.find(tab => tab.key === activeKey) ?? tabs[0]
-  const model = sessionId === undefined || active === undefined ? undefined : view(sessionId, active.key, active.contentId)
-  const state = useTerminalState(model)
+  const closeRef = useRef(closeView)
+  closeRef.current = closeView
+  // A second click before React commits the removal must not resolve a fresh
+  // model for the tab it is already closing.
+  const closing = useRef(new Set<string>())
 
+  // Switching Sessions ends the terminals the previous dock owned.
   useEffect(() => {
-    if (sessionId === undefined) {
-      setTabs([])
-      setActiveKey(undefined)
-      return
+    if (owningSession.current === sessionId) return
+    const previous = owningSession.current
+    owningSession.current = sessionId
+    if (previous !== undefined) {
+      for (const tab of liveTabs.current) closeRef.current(previous, tab.key, tab.contentId)
     }
-    const key = 'bottom-1'
-    setTabs([{ key, contentId: contentIdOf(sessionId, key), title: 'zsh' }])
-    setActiveKey(key)
-    next.current = 2
+    setTabs([])
+    setActiveKey(undefined)
+    next.current = 1
   }, [sessionId])
 
+  // A Session's dock starts its first terminal the first time the dock opens, so
+  // a closed dock never spawns a shell nobody asked for.
   useEffect(() => {
-    if (model === undefined) return
-    return model.mount()
-  }, [model])
+    if (!open || sessionId === undefined || tabs.length > 0) return
+    const key = 'bottom-1'
+    setTabs([{ sessionId, key, contentId: contentIdOf(sessionId, key) }])
+    setActiveKey(key)
+    next.current = 2
+  }, [open, sessionId, tabs.length])
 
   // A bottom terminal is not a sidebar tab, so the terminal service has no
   // layout record to retain it. Register the dock's occurrences explicitly;
   // without this hold the Host creation waits forever and the screen is blank.
   useEffect(() => {
-    if (sessionId === undefined) {
-      retainRef.current([])
-      return
-    }
-    retainRef.current(tabs.map(tab => ({ sessionId, tabId: tab.key, contentId: tab.contentId })))
-  }, [tabs, sessionId])
+    retainRef.current(tabs.map(tab => ({ sessionId: tab.sessionId, tabId: tab.key, contentId: tab.contentId })))
+  }, [tabs])
 
   useEffect(() => () => { retainRef.current([]) }, [])
 
-  if (!open || sessionId === undefined) return null
+  // A Session switch commits its new tab set after this render, so tabs of the
+  // previous Session are never resolved against the new one.
+  const owned = tabs.filter(tab => tab.sessionId === sessionId)
+  const active = owned.find(tab => tab.key === activeKey) ?? owned[0]
+  const visible = open && sessionId !== undefined
 
   const add = (): void => {
+    if (sessionId === undefined) return
     const key = 'bottom-' + String(next.current)
     next.current += 1
-    setTabs(current => [...current, { key, contentId: contentIdOf(sessionId, key), title: 'zsh' }])
+    setTabs(list => [...list, { sessionId, key, contentId: contentIdOf(sessionId, key) }])
     setActiveKey(key)
   }
 
   const close = (tab: BottomTab): void => {
-    const current = view(sessionId, tab.key, tab.contentId)
-    closeView(sessionId, tab.key, tab.contentId, current.id)
+    if (closing.current.has(tab.contentId)) return
+    closing.current.add(tab.contentId)
+    const terminalView = view(tab.sessionId, tab.key, tab.contentId)
+    closeView(tab.sessionId, tab.key, tab.contentId, terminalView.id)
     setTabs((list) => {
       const remaining = list.filter(item => item.key !== tab.key)
-      if (remaining.length === 0) return [{ key: 'bottom-1', contentId: contentIdOf(sessionId, 'bottom-1'), title: 'zsh' }]
-      return remaining
+      // The dock keeps one tab: closing the last one ends its process and starts
+      // a fresh shell in its place.
+      return remaining.length === 0
+        ? [{ sessionId: tab.sessionId, key: 'bottom-1', contentId: contentIdOf(tab.sessionId, 'bottom-1') }]
+        : remaining
     })
-    if (activeKey === tab.key) setActiveKey(tabs.find(item => item.key !== tab.key)?.key)
+    setActiveKey(current => current === tab.key ? undefined : current)
   }
 
-  const clear = (): void => { model?.write('\x0c') }
+  // Replacing the only tab reuses the fresh default close() creates.
+  const reopen = (tab: BottomTab): void => {
+    if (owned.length === 1) { close(tab); return }
+    close(tab)
+    add()
+  }
 
   const resize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
@@ -357,37 +485,20 @@ export function BottomTerminal({
   }
 
   return (
-    <section className={bottomCss.panel} style={{ height }} data-bottom-terminal>
+    <section className={bottomCss.panel} style={{ height, display: visible ? undefined : 'none' }} data-bottom-terminal>
       <div className={bottomCss.handle} role="separator" aria-orientation="horizontal" onPointerDown={resize} />
       <div className={bottomCss.tabs}>
-        {tabs.map(tab => (
-          <div key={tab.key} className={bottomCss.tab} data-active={tab.key === active?.key || undefined}>
-            <button type="button" className={bottomCss.tabButton} onClick={() => { setActiveKey(tab.key) }}>
-              <span className={bottomCss.prompt}>&gt;_</span>{tab.title}
-            </button>
-            <button type="button" className={bottomCss.closeTab} aria-label={t('close')} title={t('close')}
-              onClick={() => { close(tab) }}>×</button>
-          </div>
+        {owned.map(tab => (
+          <BottomTabChip key={tab.key} sessionId={tab.sessionId} tab={tab} active={tab.key === active?.key}
+            view={view} onSelect={() => { setActiveKey(tab.key) }} onClose={() => { close(tab) }} t={t} />
         ))}
         <button type="button" className={bottomCss.add} aria-label={t('new')} title={t('new')} onClick={add}>+</button>
       </div>
-      <div className={bottomCss.body} onKeyDownCapture={(event) => {
-        if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'l')) {
-          event.preventDefault()
-          event.stopPropagation()
-          clear()
-        }
-      }}>
-        {state === undefined || model === undefined || active === undefined
-          ? <p className={bottomCss.note}>{t('loading')}</p>
-          : state.info === undefined
-            ? <div className={bottomCss.note}>
-              <span>{state.issue ?? state.error
-                ?? (state.phase === 'creating' ? t('creating') : state.phase === 'connecting' ? t('connecting') : t('loading'))}</span>
-              {state.issue === 'missingTerminal' ? <button type="button" className={bottomCss.add} onClick={add}>{t('new')}</button> : null}
-            </div>
-            : <TerminalScreen state={state} model={model} tabKey={active.key} visible label={t('title')} theme={theme}
-              cwd={state.environment?.cwd} openSelectionMenu={() => {}} registerSelectionReader={() => () => {}} />}
+      <div className={bottomCss.body}>
+        {owned.map(tab => (
+          <BottomTabScreen key={tab.key} sessionId={tab.sessionId} tab={tab} active={tab.key === active?.key}
+            view={view} theme={theme} platform={platform} t={t} onNew={() => { reopen(tab) }} />
+        ))}
       </div>
     </section>
   )
