@@ -1,6 +1,7 @@
 /**
- * The `source-control` page: changed paths grouped by index and worktree state,
- * with real stage/unstage actions and one file's unified diff beside them.
+ * The `source-control` page: paths grouped by index and worktree state, with
+ * untracked files listed as additions in the changes group, real stage/unstage
+ * actions, and one file's unified diff beside them.
  *
  * The page is deliberately view-and-index only: Git execution belongs to the
  * Host Remote, and the browser renders the patch it returns.
@@ -94,9 +95,9 @@ function untracked(entry: GitStatusEntry): boolean {
   return entry.index === '?' && entry.worktree === '?'
 }
 
-/** One row's display letter. */
+/** One row's display letter; an untracked file reads as an addition. */
 function statusLetter(entry: GitStatusEntry): string {
-  if (untracked(entry)) return '?'
+  if (untracked(entry)) return 'A'
   return entry.index !== ' ' ? entry.index : entry.worktree
 }
 
@@ -272,9 +273,8 @@ export function SourceControlBody({
   }
 
   const stagedEntries = status?.entries.filter(staged) ?? []
-  const unstagedEntries = status?.entries.filter(entry => unstaged(entry) && !untracked(entry)) ?? []
-  const untrackedEntries = status?.entries.filter(untracked) ?? []
-  const empty = status !== undefined && stagedEntries.length === 0 && unstagedEntries.length === 0 && untrackedEntries.length === 0
+  const changedEntries = status?.entries.filter(unstaged) ?? []
+  const empty = status !== undefined && stagedEntries.length === 0 && changedEntries.length === 0
 
   if (status === undefined && error === undefined) {
     return <div className={css.page} data-source-control><p className={css.note}>{t('git.loading')}</p></div>
@@ -310,13 +310,7 @@ export function SourceControlBody({
             onSelect={(path) => { select(path, 'staged') }}
             onApply={(paths) => { void apply(paths, 'unstage') }}
             onApplyAll={(paths) => { void apply(paths, 'unstage') }} />
-          <Group title={t('git.changes')} entries={unstagedEntries} scope="working" selected={selected} busy={busy}
-            actionLabel={t('git.stage')}
-            bulkLabel={t('git.stageAll')}
-            onSelect={(path) => { select(path, 'working') }}
-            onApply={(paths) => { void apply(paths, 'stage') }}
-            onApplyAll={(paths) => { void apply(paths, 'stage') }} />
-          <Group title={t('git.untracked')} entries={untrackedEntries} scope="working" selected={selected} busy={busy}
+          <Group title={t('git.changes')} entries={changedEntries} scope="working" selected={selected} busy={busy}
             actionLabel={t('git.stage')}
             bulkLabel={t('git.stageAll')}
             onSelect={(path) => { select(path, 'working') }}

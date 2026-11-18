@@ -56,6 +56,14 @@ describe('Client UI i18n source check', () => {
     `)).toEqual([])
   })
 
+  it('accepts single-letter status tokens without accepting words', () => {
+    expect(messages(`
+      function statusLetter(): string { return 'A' }
+      function otherLetter(): string { return 'M' }
+    `)).toEqual([])
+    expect(messages('function statusWord(): string { return \'Add\' }')).toEqual(['Add'])
+  })
+
   it('does not inspect locale dictionary owners', () => {
     expect(findUiI18nViolations(
       'packages/client/ui-example/src/client/locales.ts',

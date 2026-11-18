@@ -150,7 +150,7 @@
 }
 
 .letter[data-letter='M'] { color: var(--dsw-alias-status-warning); }
-.letter[data-letter='A'], .letter[data-letter='?'] { color: var(--dsw-alias-status-success); }
+.letter[data-letter='A'] { color: var(--dsw-alias-status-success); }
 .letter[data-letter='D'] { color: var(--dsw-alias-status-danger); }
 .letter[data-letter='R'] { color: var(--dsw-alias-status-info); }
 
