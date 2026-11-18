@@ -78,6 +78,24 @@ it.each(['dsh-app://shell/plugin-manager.html', 'dsh-app://other/index.html', 'h
   expect(electron.ipcRenderer.on.mock.calls.some(([channel]) => channel === DESKTOP_IPC.browserOpenRequested)).toBe(false)
 })
 
+it('drains operating-system file opens through one subscription', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  electron.ipcRenderer.invoke.mockImplementation((channel: string) => Promise.resolve(
+    channel === DESKTOP_IPC.openFilesTake ? ['/tmp/notes.md'] : undefined,
+  ))
+  await import('../src/preload-app.ts')
+  const api = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  const listener = vi.fn()
+  const off = api.openFiles.subscribe(listener)
+  await vi.waitFor(() => { expect(listener).toHaveBeenCalledWith(['/tmp/notes.md']) })
+  const handler = electron.ipcRenderer.on.mock.calls.find(([channel]) => channel === DESKTOP_IPC.openFilesAvailable)?.[1] as () => void
+  handler()
+  await vi.waitFor(() => { expect(electron.ipcRenderer.invoke).toHaveBeenCalledTimes(2) })
+  off()
+  expect(electron.ipcRenderer.off).toHaveBeenCalledWith(DESKTOP_IPC.openFilesAvailable, handler)
+  electron.ipcRenderer.invoke.mockReset()
+})
+
 it('reads the local machine description only from the application main frame', async () => {
   const description = 'platform=darwin; os=15.6; app_arch=arm64; cpu=Apple M4; memory_gib=32.0'
   vi.stubGlobal('location', new URL('dsh-app://app/index.html'))

@@ -33,6 +33,18 @@ function createProductApi(): DshDesktopProductApi {
         // Main-process shutdown also releases every prepared file.
       }) },
     },
+    openFiles: {
+      subscribe: (listener) => {
+        const drain = (): void => {
+          void (ipcRenderer.invoke(DESKTOP_IPC.openFilesTake) as Promise<string[]>)
+            .then((paths) => { if (paths.length > 0) listener(paths) })
+            .catch((_error: unknown) => { /* Main-process shutdown ends the open-file queue. */ })
+        }
+        ipcRenderer.on(DESKTOP_IPC.openFilesAvailable, drain)
+        drain()
+        return () => { ipcRenderer.off(DESKTOP_IPC.openFilesAvailable, drain) }
+      },
+    },
     deviceInfo: () => ipcRenderer.invoke(DESKTOP_IPC.deviceInfo) as Promise<string>,
     keyboard: {
       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,

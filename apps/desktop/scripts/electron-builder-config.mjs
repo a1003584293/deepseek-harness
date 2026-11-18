@@ -109,6 +109,13 @@ export function createElectronBuilderConfig(
   return {
     appId,
     protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
+    // Finder lists the application under Open With without becoming the default
+    // handler (rank Alternate).
+    fileAssociations: [
+      { ext: ['md', 'markdown', 'txt', 'log'], name: 'Text document', description: 'Text document', role: 'Editor', rank: 'Alternate' },
+      { ext: ['json', 'jsonc', 'yaml', 'yml', 'toml', 'ini', 'conf', 'env', 'properties'], name: 'Configuration file', description: 'Configuration file', role: 'Editor', rank: 'Alternate' },
+      { ext: ['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs', 'py', 'sh', 'bash', 'zsh', 'fish', 'html', 'htm', 'css', 'scss', 'less', 'xml', 'sql', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'cc', 'cxx', 'hpp', 'cs', 'php', 'rb', 'kt', 'kts', 'swift', 'lua', 'pl', 'r'], name: 'Source code file', description: 'Source code file', role: 'Editor', rank: 'Alternate' },
+    ],
     extraMetadata: {
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',

@@ -8,6 +8,7 @@ import { isDesktopUpdateChannel } from './settings-file.ts'
 import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { access, readFile, writeFile } from 'node:fs/promises'
+import { statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -71,6 +72,7 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { DesktopOpenFiles } from './open-files.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => { await stopOperationReports() }
@@ -93,6 +95,18 @@ const rendererConsole = new RendererConsoleTail()
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 // set before ready so the first fatal report already resolves under it.
 app.setAppLogsPath()
+
+// Finder and other shells deliver open requests through an application event,
+// sometimes before ready; the queue outlives any one window.
+const launchFiles = new DesktopOpenFiles({
+  isFile: (path) => {
+    try { return statSync(path).isFile() } catch { return false }
+  },
+})
+app.on('open-file', (event, path) => {
+  event.preventDefault()
+  if (launchFiles.enqueue(path)) focusPrimaryWindow()
+})
 
 function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
   return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
@@ -408,6 +422,11 @@ async function main(): Promise<void> {
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
   let welcomeWindow: BrowserWindow | undefined
+  const stopLaunchFiles = launchFiles.onAvailable(() => {
+    const window = mainWindow
+    if (window !== undefined && !window.isDestroyed()) window.webContents.send(DESKTOP_IPC.openFilesAvailable)
+  })
+  app.once('will-quit', stopLaunchFiles)
   const installFileDrag = (): (() => Promise<void>) => installDesktopFileDrag(
     event => assertProductSender(event),
     (address, signal) => {
@@ -817,6 +836,11 @@ async function main(): Promise<void> {
   const shortcuts = installDesktopShortcuts(() => mainWindow, app.getPath('userData'),
     process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux', () => { refreshApplicationMenu() }, window => updateOverlays.input(window))
   app.on('will-quit', () => { shortcuts.dispose() })
+
+  ipcMain.handle(DESKTOP_IPC.openFilesTake, (event) => {
+    assertProductSender(event)
+    return launchFiles.take()
+  })
 
   ipcMain.handle(DESKTOP_IPC.boot, async (event) => {
     assertDesktopSender(event, ['app'])
@@ -1623,19 +1647,24 @@ async function main(): Promise<void> {
   publishUpdate(updateState)
 }
 
-const ownsDesktopInstance = claimDesktopSingleInstance(app, () => { focusPrimaryWindow() })
-
-if (ownsDesktopInstance) void app.whenReady().then(main).catch(async (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(error)
-  const diagnosticFile = process.env.DSH_DESKTOP_DIAGNOSTIC_FILE
-  if (diagnosticFile !== undefined) {
-    await writeFile(diagnosticFile, `${error instanceof Error ? error.stack ?? message : message}\n`).catch(() => undefined)
-  }
-  reportFatal(error, 'main')
-}).catch(async (error: unknown) => {
-  console.error(error)
-  shuttingDown = true
-  await stopOperationReports()
-  app.exit(1)
+const ownsDesktopInstance = claimDesktopSingleInstance(app, () => { focusPrimaryWindow() }, (argv) => {
+  launchFiles.enqueueArguments(argv.slice(1))
 })
+
+if (ownsDesktopInstance) {
+  launchFiles.enqueueArguments(process.argv.slice(1))
+  void app.whenReady().then(main).catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(error)
+    const diagnosticFile = process.env.DSH_DESKTOP_DIAGNOSTIC_FILE
+    if (diagnosticFile !== undefined) {
+      await writeFile(diagnosticFile, `${error instanceof Error ? error.stack ?? message : message}\n`).catch(() => undefined)
+    }
+    reportFatal(error, 'main')
+  }).catch(async (error: unknown) => {
+    console.error(error)
+    shuttingDown = true
+    await stopOperationReports()
+    app.exit(1)
+  })
+}

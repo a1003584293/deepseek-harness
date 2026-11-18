@@ -6,6 +6,13 @@ export interface DesktopElectronBuilderConfig {
   readonly copyright: string
   readonly artifactName: string
   readonly protocols: readonly [{ readonly name: 'DeepSeek Harness'; readonly schemes: readonly ['dsh'] }]
+  readonly fileAssociations: readonly {
+    readonly ext: readonly string[]
+    readonly name: string
+    readonly description: string
+    readonly role: 'Editor'
+    readonly rank: 'Alternate'
+  }[]
   readonly directories: {
     readonly output: string
   }

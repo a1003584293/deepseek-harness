@@ -27,6 +27,8 @@ export const DESKTOP_IPC = {
   browserRelease: 'dsh-desktop:browser-release',
   browserOpenRequested: 'dsh-desktop:browser-open-requested',
   directoryPick: 'dsh-desktop:directory-pick',
+  openFilesAvailable: 'dsh-desktop:open-files-available',
+  openFilesTake: 'dsh-desktop:open-files-take',
   fileDragPrepare: 'dsh-desktop:file-drag-prepare',
   fileDragCancel: 'dsh-desktop:file-drag-cancel',
   fileDragStart: 'dsh-desktop:file-drag-start',
@@ -89,12 +91,24 @@ export interface DesktopUpdatePresentation {
   readonly configurationError?: DesktopChannelState['error']
 }
 
+/** The Desktop shell's queue of files the operating system asked to open. */
+export interface DesktopOpenFilesBridge {
+  /**
+   * Listen for opened paths; the first call also drains anything queued before now.
+   * @param listener - receives one drain of absolute file paths.
+   * @returns a disposer that removes this listener.
+   */
+  subscribe(listener: (paths: readonly string[]) => void): () => void
+}
+
 /** Product documents cannot supply update versions, package URLs, or installation authorization. */
 export interface DshDesktopProductApi {
   readonly fileActions: DesktopFileActions
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge
   readonly fileDrag: DesktopFileDrag
+  /** Files the operating system asked the running application to open. */
+  readonly openFiles: DesktopOpenFilesBridge
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi
   /**
