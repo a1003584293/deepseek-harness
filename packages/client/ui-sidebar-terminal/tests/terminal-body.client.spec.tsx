@@ -20,6 +20,7 @@ class FakeTerminal {
   options: { disableStdin?: boolean; theme?: ITheme; fontFamily?: string; fontSize?: number }
   textarea: HTMLTextAreaElement | undefined = document.createElement('textarea')
   input: ((data: string) => void) | undefined
+  customKeyHandler: ((event: KeyboardEvent) => boolean) | undefined
   readonly disposeInput = vi.fn()
   readonly parser = { registerOscHandler: vi.fn(() => ({ dispose: vi.fn() })) }
   renderFrame: (() => void) | undefined
@@ -38,6 +39,7 @@ class FakeTerminal {
   constructor(options: object) { this.options = options; fake.terminals.push(this) }
   open(node: HTMLElement) { node.appendChild(this.textarea!) }
   onData(input: (data: string) => void) { this.input = input; return { dispose: this.disposeInput } }
+  attachCustomKeyEventHandler(handler: (event: KeyboardEvent) => boolean) { this.customKeyHandler = handler }
 }
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: object) { return new FakeTerminal(options) }) }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return fake.dimensions } } }))
@@ -165,6 +167,22 @@ it('keeps one emulator across rename and locale updates, applies snapshots and o
   expect(terminal.dispose).toHaveBeenCalledOnce()
   expect(terminal.disposeInput).toHaveBeenCalledOnce()
   expect(disconnect).toHaveBeenCalledOnce()
+})
+
+it('maps macOS Option+arrow to shell word motion without leaking D or C', () => {
+  const snapshot: TerminalViewState = { ...idle, info, phase: 'connected', writable: true }
+  const h = mount(snapshot)
+  const terminal = fake.terminals[0]!
+  const handler = terminal.customKeyHandler!
+  const left = new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, cancelable: true })
+  expect(handler(left)).toBe(false)
+  expect(left.defaultPrevented).toBe(true)
+  expect(h.model.write).toHaveBeenLastCalledWith('\x1bb', true)
+  const right = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, cancelable: true })
+  expect(handler(right)).toBe(false)
+  expect(h.model.write).toHaveBeenLastCalledWith('\x1bf', true)
+  expect(handler(new KeyboardEvent('keydown', { key: 'ArrowLeft', ctrlKey: true, altKey: true }))).toBe(true)
+  expect(handler(new KeyboardEvent('keydown', { key: 'a', altKey: true }))).toBe(true)
 })
 
 it.each([

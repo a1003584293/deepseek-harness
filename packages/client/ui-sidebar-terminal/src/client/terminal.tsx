@@ -145,6 +145,17 @@ export function TerminalScreen({ state, model, tabKey, visible, label, theme, cw
     const addon = new FitAddon()
     xterm.loadAddon(addon)
     xterm.open(node)
+    // macOS terminals send ESC b/f for Option+arrow; xterm's CSI 1;3D/C form
+    // reaches readline and zsh as an unrecognized sequence whose trailing D/C
+    // is inserted literally. Keep the shell-native word motion instead.
+    xterm.attachCustomKeyEventHandler((event) => {
+      if (platform !== 'macos' || event.type !== 'keydown' || !current.current.state.writable
+        || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return true
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return true
+      event.preventDefault()
+      model.write(event.key === 'ArrowLeft' ? '\x1bb' : '\x1bf', true)
+      return false
+    })
     const palette = new TerminalTheme(xterm)
     colors.current = palette
     const cursor = observeTerminalCursor(xterm, node, () => palette.cursor)
@@ -174,7 +185,7 @@ export function TerminalScreen({ state, model, tabKey, visible, label, theme, cw
       terminal.current = undefined
       fit.current = undefined
     }
-  }, [model])
+  }, [model, platform])
 
   // The keyboard pin gesture reads this screen's own xterm selection.
   useEffect(() => registerSelectionReader(tabKey, () => {

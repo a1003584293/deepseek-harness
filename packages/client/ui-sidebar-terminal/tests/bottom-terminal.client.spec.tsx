@@ -32,6 +32,7 @@ class FakeTerminal {
   constructor(options: object) { this.options = options; fake.terminals.push(this) }
   open(node: HTMLElement) { node.appendChild(this.textarea) }
   onData(input: (data: string) => void) { this.input = input; return { dispose: vi.fn() } }
+  attachCustomKeyEventHandler(_handler: (event: KeyboardEvent) => boolean) {}
 }
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: object) { return new FakeTerminal(options) }) }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return fake.dimensions } } }))
