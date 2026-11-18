@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLayoutStore } from '../src/client/stores.ts'
 import type { MainPanelId } from '../src/client/service.ts'
 
-beforeEach(() => { vi.stubGlobal('innerWidth', 1920) })
+beforeEach(() => { localStorage.clear(); vi.stubGlobal('innerWidth', 1920) })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('createLayoutStore', () => {
@@ -25,15 +25,18 @@ describe('createLayoutStore', () => {
     })
   })
 
-  it('creates independent instances without browser persistence', () => {
-    const write = vi.spyOn(Storage.prototype, 'setItem')
-    const a = createLayoutStore().create()
-    const b = createLayoutStore().create()
-    a.actions.setSidebar(400)
-    a.actions.openRightbar(true, false)
-    expect(b.store.getSnapshot().layoutInfo.sidebar).toBe(280)
-    expect(b.store.getSnapshot().layoutInfo.rightbar).toBeNull()
-    expect(write).not.toHaveBeenCalled()
+  it('persists the sidebar open and closed states across stores', () => {
+    const first = createLayoutStore().create()
+    first.actions.toggleSidebar()
+    expect(createLayoutStore().create().store.getSnapshot().layoutInfo.sidebar).toBe(0)
+    first.actions.toggleSidebar()
+    expect(createLayoutStore().create().store.getSnapshot().layoutInfo.sidebar).toBe(280)
+  })
+
+  it('does not persist the right panel preference', () => {
+    const first = createLayoutStore().create()
+    first.actions.openRightbar(true, false)
+    expect(createLayoutStore().create().store.getSnapshot().layoutInfo.rightbar).toBeNull()
   })
 
   it('clamps the sidebar to 264–420px', () => {

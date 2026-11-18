@@ -9,9 +9,36 @@ import {
   SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT, SIDEBAR_MAX, SIDEBAR_MIN,
 } from './columns.ts'
 
+/** One frame-wide preference: the wide sidebar's width, with 0 meaning closed. */
+const SIDEBAR_PREFERENCE_KEY = 'dsh.layout.sidebar'
+
+function readSidebarPreference(): number {
+  if (typeof localStorage === 'undefined') return SIDEBAR_DEFAULT
+  try {
+    const raw = localStorage.getItem(SIDEBAR_PREFERENCE_KEY)
+    if (raw === null) return SIDEBAR_DEFAULT
+    const value = Number(raw)
+    if (!Number.isFinite(value)) return SIDEBAR_DEFAULT
+    return value === 0 ? 0 : clampWidth(value, SIDEBAR_MIN, SIDEBAR_MAX)
+  } catch (error: unknown) {
+    console.warn('layout sidebar preference could not be read:', error)
+    return SIDEBAR_DEFAULT
+  }
+}
+
+function rememberSidebarPreference(px: number): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(px))
+  } catch (error: unknown) {
+    console.warn('layout sidebar preference could not be saved:', error)
+  }
+}
+
 /**
- * Transient layout preferences. Responsive concessions never rewrite widths;
- * the right panel's expanded state belongs to its occupant.
+ * Frame layout preferences. The left sidebar's open state persists; responsive
+ * concessions never rewrite widths, and the right panel's expanded state
+ * belongs to its occupant.
  */
 type LayoutState = {
   panelInfo: {
@@ -85,7 +112,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
     init: (): LayoutState => ({
       panelInfo: { activePanelId: null },
       layoutInfo: {
-        sidebar: SIDEBAR_DEFAULT,
+        sidebar: readSidebarPreference(),
         viewportWidth: window.innerWidth,
         narrowExpanded: false,
         rightbar: null,
@@ -114,7 +141,10 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       toggleSidebar: (d) => {
         d.layoutInfo.rightbarInstant = false
         if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = !d.layoutInfo.narrowExpanded
-        else d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : 0
+        else {
+          d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : 0
+          rememberSidebarPreference(d.layoutInfo.sidebar)
+        }
       },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
