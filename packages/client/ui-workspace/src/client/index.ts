@@ -222,7 +222,17 @@ export function apply(ctx: Context, config: SyncedConfig<WorkspaceNavigationConf
     hooks: { deleteRequest },
     settleSessionDelete: () => { deleteRequest.set(null) },
     deleteSession: async (sessionId) => {
-      const result = await ctx.remote.session.delete({ sessionId })
+      // Keep a running Session's view intact: its delete is refused, and closing
+      // the view would only hide the work the refusal is protecting.
+      if (sessions.list.getSnapshot().byId[sessionId]?.running !== true) await uiWorkspace.closeSession(sessionId)
+      let result = await ctx.remote.session.delete({ sessionId })
+      // The Host withdraws a released Session asynchronously; retry only the
+      // open-session refusal, never a running-turn or other business failure.
+      for (let attempt = 0; !result.ok && attempt < 40
+        && result.error.message.includes('still open in this process'); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        result = await ctx.remote.session.delete({ sessionId })
+      }
       if (!result.ok) throw new Error(result.error.message)
       await sessions.refresh()
     },

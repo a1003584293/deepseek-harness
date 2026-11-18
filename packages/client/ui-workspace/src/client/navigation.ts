@@ -46,6 +46,14 @@ export interface UiWorkspace {
    */
   openSession(target: SessionTarget): void
   /**
+   * Release the main-view and recent-view references that keep a Session open.
+   * Clears the main selection when it shows this Session, then waits for local
+   * references to settle so a subsequent Host delete is not refused as open.
+   * @param sessionId - Session to release.
+   * @returns completion after references settle, or the wait bound expires.
+   */
+  closeSession(sessionId: SessionId): Promise<void>
+  /**
    * Connect a Workspace and open its Session unless a later navigation supersedes it.
    * @param workspaceId - target Workspace.
    * @param beforeOpen - optional synchronous preparation for the selected Session,
@@ -301,6 +309,15 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   openSession(target: SessionTarget): void {
     this.replaceMain(target, this.lifetime.signal, 'reveal')
+  }
+
+  async closeSession(sessionId: SessionId): Promise<void> {
+    if (this.mainReference?.sessionId === sessionId) this.clearMain()
+    this.recentViews.forget(sessionId)
+    const deadline = Date.now() + 2_000
+    while (this.sessions.retainInfo(sessionId).getSnapshot().referenceCount > 0 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
   }
 
   openWorkspace(

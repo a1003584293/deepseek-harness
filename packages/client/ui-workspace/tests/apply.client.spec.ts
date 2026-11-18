@@ -151,6 +151,7 @@ async function bench(access: 'fake' | 'static' = 'fake') {
     create: vi.fn(async () => 'created' as never),
     retain,
     using,
+    retainInfo: vi.fn(() => ({ getSnapshot: () => ({ referenceCount: 0, retainedBy: {} }), subscribe: () => () => {} })),
     refresh,
     search,
     searchResultLimit: 20,
@@ -602,14 +603,30 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'shell.overlay')
     await b.ctx.plugin({ inject: [...inject], apply }, syncedConfig({ recentViewLimit: 10 })).await()
     const injected = faceOf(entry(b.slots, 'shell.overlay', 'workspace.session-delete')) as SessionDeleteConfirmInjected
+    const close = vi.spyOn(b.ctx.uiWorkspace, 'closeSession')
 
     await injected.deleteSession(sid('one'))
+    expect(close).toHaveBeenCalledWith(sid('one'))
     expect(b.deleteSession).toHaveBeenCalledExactlyOnceWith({ sessionId: 'one' })
     expect(b.refresh).toHaveBeenCalledOnce()
 
     // A Host refusal keeps the message for the dialog and refreshes nothing.
     b.deleteSession.mockResolvedValueOnce({ ok: false, error: new Error('session/delete failed') } as never)
     await expect(injected.deleteSession(sid('two'))).rejects.toThrow('session/delete failed')
+    expect(b.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('retries only the open-session refusal after release', async () => {
+    const b = await bench()
+    declare(b.slots, 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }, syncedConfig({ recentViewLimit: 10 })).await()
+    const injected = faceOf(entry(b.slots, 'shell.overlay', 'workspace.session-delete')) as SessionDeleteConfirmInjected
+
+    b.deleteSession
+      .mockResolvedValueOnce({ ok: false, error: new Error('the session is still open in this process; close it before deleting') } as never)
+      .mockResolvedValueOnce({ ok: true, value: undefined } as never)
+    await injected.deleteSession(sid('one'))
+    expect(b.deleteSession).toHaveBeenCalledTimes(2)
     expect(b.refresh).toHaveBeenCalledOnce()
   })
 

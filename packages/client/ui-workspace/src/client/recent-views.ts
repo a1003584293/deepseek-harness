@@ -59,6 +59,19 @@ export class RecentSessionViews {
   }
 
   /**
+   * Drop one Session from recent retention before a destructive operation, so its
+   * history reference cannot keep the Host Session open.
+   * @param sessionId - Session to forget.
+   */
+  forget(sessionId: SessionId): void {
+    this.order = this.order.filter(id => id !== sessionId)
+    const reference = this.held.get(sessionId)
+    if (reference === undefined) return
+    this.held.delete(sessionId)
+    reference.release()
+  }
+
+  /**
    * Sync whenever the Session list, Workspace list, Session UI status, or recent-view limit changes.
    * @returns disposer that stops syncing and releases every held Session.
    */
