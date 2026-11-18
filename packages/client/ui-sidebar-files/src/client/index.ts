@@ -14,10 +14,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { createSnapshotStore, type BoundActions } from '@deepseek-ai/dsh-client-store'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { isAbsoluteWorkspacePath, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
+import { isAbsoluteWorkspacePath, isEditableFileAddress, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { FILES_ID, FILES_KIND, filesDefinition } from './definition.tsx'
 import { canOpenOf, createList, createWatch, filesFace, type FilesInjected } from './face.ts'
@@ -68,6 +69,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** This package's copy namespace. */
 const NS = 'sidebarFiles'
+
+/** The Desktop shell's queue of files the operating system asked to open. */
+interface DesktopOpenFiles {
+  subscribe(listener: (paths: readonly string[]) => void): () => void
+}
 
 /**
  * Required browser services: the tab registry, the keyed seat, the Remote
@@ -346,6 +352,41 @@ export function apply(ctx: ClientContext): void {
       openEditor: (path) => { ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } }) },
     }),
   }, EditFileAction)), 'ui-sidebar-files: preview edit action')
+
+  // One opener for files the composer receives and files the Desktop shell was
+  // asked to open: text-like files get the Monaco page, everything else the
+  // preview that claims the file's session address (absolute paths included).
+  const openPath = (sessionId: SessionId, path: string): void => {
+    if (isEditableFileAddress(path)) {
+      ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } })
+      return
+    }
+    ctx.sidebarRight.openResourceIn(sessionId, sessionFileAddress(sessionId, path))
+  }
+  ctx.on('conversation/file-reference', ({ sessionId, path }) => { openPath(sessionId, path) })
+  let pendingDesktopFiles: string[] = []
+  const flushDesktopFiles = (): void => {
+    const sessionId = ctx.sidebarRight.mounted.getSnapshot()
+    if (sessionId === undefined || pendingDesktopFiles.length === 0) return
+    const paths = pendingDesktopFiles
+    pendingDesktopFiles = []
+    for (const path of paths) openPath(sessionId, path)
+  }
+  ctx.effect(() => {
+    const bridge = (globalThis as { dshDesktop?: { openFiles?: DesktopOpenFiles } }).dshDesktop?.openFiles
+    if (bridge === undefined) return () => {}
+    const unsubscribeFiles = bridge.subscribe((paths) => {
+      pendingDesktopFiles.push(...paths)
+      flushDesktopFiles()
+    })
+    const unsubscribeMounted = ctx.sidebarRight.mounted.subscribe(() => { flushDesktopFiles() })
+    flushDesktopFiles()
+    return () => {
+      unsubscribeFiles()
+      unsubscribeMounted()
+      pendingDesktopFiles = []
+    }
+  }, 'ui-sidebar-files: desktop open files')
 
   // Quick open: a VS Code-style palette over recent files and the workspace.
   // The sequence value only says "opened again", so one entry resets its query.

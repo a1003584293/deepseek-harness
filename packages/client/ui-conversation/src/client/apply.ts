@@ -521,6 +521,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           }
           const uploads: File[] = []
           const references: ReferenceInsert[] = []
+          const referenced: string[] = []
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
           for (const file of files) {
             const directory = directories.has(file)
@@ -540,6 +541,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
               source: 'reference', ref: mention, label: directory ? `${label}/` : label,
               appearance: directory ? 'folder' : 'file', clipboardText: mention,
             })
+            if (!directory) referenced.push(path)
           }
           try {
             // The Host stages uploads for ordinary Sessions only; a subagent continuation's images travel inline.
@@ -549,6 +551,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
               conversation.releaseDraftAttachments(drafts)
               return t('attachment.dropBlocked')
             }
+            for (const filePath of referenced) ctx.emit('conversation/file-reference', { sessionId, path: filePath })
             return null
           } catch (error: unknown) {
             if (error instanceof UnsupportedImageMediaTypeError) return t('image.unsupportedType')

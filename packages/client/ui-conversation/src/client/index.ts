@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 /** Browser Conversation assemble core, React adapter, shell, input, and text projection plugin. */
 export type {} from './user-text/session-reference-rule.ts'
 
@@ -107,6 +108,18 @@ export type { ArbitrateKey, ArbitrateOutcome, DraftInput, DraftQuote, DraftRefer
 export type { ComposerBlock, ComposerBlocks } from './contract/composer-blocks.ts'
 
 declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * One non-image file path entered a Session's composer as a reference, after
+     * the composer accepted it. Consumers open the path without knowing the
+     * composer or its attachment model.
+     * @param payload - the Session and the path the reference names.
+     * @param payload.sessionId - Session whose composer accepted the reference.
+     * @param payload.path - workspace-relative or absolute file path.
+     * @mode emit
+     */
+    'conversation/file-reference'(payload: { readonly sessionId: SessionId; readonly path: string }): void
+  }
   interface Context {
     /** Scope-addressed Conversation actions and per-Session input registry. */
     conversation: import('./service.ts').IConversation

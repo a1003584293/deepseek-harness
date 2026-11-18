@@ -568,13 +568,16 @@ describe('Conversation inject API', () => {
     vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => paths.get(file.name) ?? '' })
     try {
       const desktop = await bench()
+      const referenced: { readonly sessionId: SessionId; readonly path: string }[] = []
+      desktop.runtime.ctx.on('conversation/file-reference', (payload) => { referenced.push(payload) })
       const composer = desktop.composerApi(ROOT)
       const { state } = desktop.inputApi(ROOT)
       const note = new File([Uint8Array.of(1)], 'notes.md', { type: 'text/markdown' })
       const shot = new File([Uint8Array.of(2)], 'shot.png', { type: 'image/png' })
       const pasted = new File([Uint8Array.of(3)], 'pasted.bin', { type: 'application/octet-stream' })
       expect(composer.addFiles?.([folder, note, shot, pasted], new Set([folder]))).toBeNull()
-      // The folder and the file became references in the draft; the image and the pathless bytes stayed drafts.
+      // The folder and the file became references in the draft; only the file is a path a consumer can open.
+      expect(referenced).toEqual([{ sessionId: ROOT, path: '/Users/me/notes.md' }])
       expect(state.getSnapshot().draft).toBe('@"/Users/me/my project/" @/Users/me/notes.md ')
       const drafts = composer.resolveDraftAttachments?.(state.getSnapshot().attachmentIds) ?? []
       expect(drafts.map(draft => draft.kind)).toEqual(['image', 'file'])
