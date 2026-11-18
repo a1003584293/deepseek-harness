@@ -60,18 +60,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       }
     }
     /**
-     * Header toolbar contributions acting on the previewed file, rendered
-     * after the preview's own controls once the file's Host path is known.
-     */
-    'sidebar.right.tab.document.actions': {
-      kind: 'list'
-      scope: 'session'
-      owner: {
-        /** Absolute path in the file's execution environment; native actions must verify a Host mapping. */
-        readonly absolutePath: string
-      }
-    }
-    /**
      * Empty-state contributions for a file this preview cannot render,
      * offered where Retry would stand once the file's Host path is known.
      */

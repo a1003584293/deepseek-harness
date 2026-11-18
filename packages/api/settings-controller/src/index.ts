@@ -186,6 +186,12 @@ export class SettingsController extends TypertRemoteService {
     }
   }
 
+  /**
+   * Open the Session's settings document in the desktop's text editor.
+   * @param signal - caller lifetime; abort terminates preparation or opening.
+   * @returns whether the document opened.
+   * @throws RemoteError when no document exists, preparation fails, or the desktop refuses the path.
+   */
   @Remote
   async openSettingsDocument(signal: AbortSignal): Promise<SettingsDocumentOpenValue> {
     const settings = this.provider()

@@ -34,10 +34,10 @@ kind: "package-reference"
 - **类型**：`ctx.sidebarRightTabs.register(...)`，kind 为 `files`，id 为 `@deepseek-ai/dsh-client-ui-sidebar-files`，档位 `builtin`，没有 patterns，另有一个打开该类型的引导页入口（order 10，标题与描述取自 `sidebarFiles` 命名空间，图标为黄色文件夹）。
 - **源代码管理页**：第二个注册类型，kind 与 id 均为 `source-control`，引导页入口 order 20。正文按已暂存、更改分组显示路径，未跟踪文件在更改组中以新增（`A`）显示；点击路径读取该范围的统一 diff；单文件与批量操作调用 `remote.gitPanel.stage` / `remote.gitPanel.unstage`，随后重新读取状态。Git 执行、仓库发现和索引修改都在 Host，标签页只渲染返回的补丁。非二进制补丁在 Web 入口挂载了 Monaco 时使用 shell 自有的 Monaco diff 编辑器，否则回退到内置的统一文本视图。见 [@deepseek-ai/dsh-api-workspace-files](../../api/workspace-files/README.zh.md#source-control)。
 - **编辑器**：第三个注册类型，kind 为 `file-editor`，id 为 `@deepseek-ai/dsh-client-ui-sidebar-files/editor`，由文本预览标题行的编辑按钮打开（在目录树保持挂载的位置也可双击文件行）。正文通过 `workspaceFiles.readDocument` 读取完整文档，在 shell 自有的 Monaco 编辑器中按设置的代码字体与 16 px 滚动条渲染，重开文件时恢复上次的滚动与光标位置，显示未保存标记，并通过 Command/Ctrl+S 调用 `workspaceFiles.writeDocument`，带上加载时的版本保存。版本过期时显示冲突；标题行同时提供重新加载与保存按钮。底栏左侧固定工作区分支，右侧固定语言选择器；会话名、工作区名、账号名和充值余额在两者之间分配宽度并各自居中显示。账号名与充值余额取自账号 UI 状态的显示文本并原样渲染，因此其分位与 Account 设置页一致。同一组件通过 `sidebar.right.tab.document.actions` 提供预览的编辑按钮。Desktop 外壳请求打开的文件和 composer 接收的路径也在这里打开；非文本文件改为打开预览。当前 Session 没有打开文件编辑器标签页时，composer 的 `conversation.composer.facts` 行显示相同的分支、会话名、工作区名、账号名与余额；一旦打开文件编辑器标签页，该行隐藏，因为编辑器底栏已经显示这些事实。
-- **文件页正文**：以该 id 为键的 `sidebar.right.pane.tab` slot。其标题行横跨页面，通过共享的 [`PathLabel`](../ui-primitives/README.zh.md#component-catalog) 显示根路径，目录使用弱化颜色，最后一段使用主色；路径过长时保留尾部字符并在左侧渐隐，悬停显示完整路径。目录树的重新读取控件和搜索栏开关位于由文件页注册声明的 Session 作用域 `sidebar.right.tab.files.actions` 列表之前（通过 `absolutePath` 传入当前显示的根目录）；[`ui-open-in-app`](../ui-open-in-app/README.zh.md) 在此提供工作区目录打开按钮。标题行下方由该分栏的导航栏铺满整页，停靠与浮动时都一样，这里没有导航栏开关。
+- **文件页正文**：以该 id 为键的 `sidebar.right.pane.tab` slot。其标题行横跨页面，通过共享的 [`PathLabel`](../ui-primitives/README.zh.md#component-catalog) 显示根路径，目录使用弱化颜色，最后一段使用主色；路径过长时保留尾部字符并在左侧渐隐，悬停显示完整路径。目录树的重新读取控件和搜索栏开关位于由文件页注册声明的 Session 作用域 `sidebar.right.tab.files.actions` 列表之前（通过 `absolutePath` 传入当前显示的根目录）；[`ui-open-in-app`](../ui-open-in-app/README.zh.md) 在此提供工作区目录打开按钮。末端打开控件的边框与上排折叠图标的可见右边缘对齐，位于其热区内侧。双按钮打开控件使搜索与上排分屏图标中心对齐。单应用控件按实际宽度自然靠右，保留普通的 4px 间距，不预留对齐列。目录操作没有渲染内容时，该列及其间距消失，搜索与上排折叠图标对齐。标题行下方由该分栏的导航栏铺满整页，停靠与浮动时都一样，这里没有导航栏开关。
 - **各行**：root 作用域的 Component Factory `sidebar.files.tree`，接收调用方的条目和局部 `accessory` slot；见[复用目录树 Factory](#tree-factory)。
 - **导航栏**：Session 作用域的 Component Factory `sidebar.files.navigator`。文件页正文和 [`ui-sidebar-documentpreview`](../ui-sidebar-documentpreview/README.zh.md) 直接渲染它，显示在每个预览旁，无论停靠还是浮动。它绘制[搜索栏](#search)、目录树及其调整宽度的边缘，没有自己的标题行：预览旁只有预览自己的标题行，目录树的重新读取与目录操作留在 `files` 页上。
-- **开关**：Session 作用域的 Factory `sidebar.files.navigator.toggle`，在预览头部末端直接渲染，传入 `useTabInfo`。两个 Factory 共用文件页的 store handle 和 inject face，每个分栏保留一份开关状态；文件页正文没有导航栏开关。
+- **开关**：Session 作用域的 Factory `sidebar.files.navigator.toggle`，在预览头部末端直接渲染，传入 `useTabInfo`。文件夹图形使用 16px，在共用的 28px 热区内补足横向轮廓的视觉尺寸，与相邻工具栏图标保持平衡。两个 Factory 共用文件页的 store handle 和 inject face，每个分栏保留一份开关状态；文件页正文没有导航栏开关。
 - **标签页标题**：以该 id 为键的 `sidebar.right.pane.tab.title` slot：类型标签前的一枚 16px 共享 `FileTypeIcon` 文件夹图标。树本身的行不画这枚图标。
 
 [注册入口](src/client/index.ts) 在共享 [files face](src/client/face.ts) 与[分栏 store](src/client/store.ts) 上组装文件页、导航栏、开关和目录树 Factory。
@@ -127,6 +127,8 @@ kind: "package-reference"
 
 <details>
 <summary>维护者工作上下文——点击展开</summary>
+
+每层子级图标框承接父级文字列；缩进包含父级图标框及图文间距，并保留图标内部留白。
 
 无。
 

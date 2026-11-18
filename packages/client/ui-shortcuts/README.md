@@ -25,6 +25,8 @@ Browse the commands available in the current window and find them by action, Eng
 <a id="use-this-package"></a>
 ## Use this package
 
+Shortcut save feedback reuses the shared 16px Regular warning and circled-check glyphs.
+
 The Web app bundle mounts this package together with `shortcuts`. The reference shows only registered commands and existing fixed input actions. Desktop shows the effective device keys; commands without a Web default show No shortcut. The top-level Shortcuts section embeds the searchable reference directly; Mod+/ opens the same reference in a dialog titled “Keyboard shortcuts” in English and “快捷键” in Chinese. Its 480×600 CSS-pixel card shrinks to fit smaller windows; the header and search remain above an internally scrolling list. The search field receives focus on open without changing its border color. Automatic entry and return focus in the reference, recorder, and reset confirmation omit outlines, including returns after Escape and application close shortcuts. Containers remain outline-free, and Tab and directional navigation retain their visible focus indicators. The Shortcuts section is a top-level Settings destination beside General; its search field, editable rows, and footer are the reference itself, so opening Settings lands directly on the list without another dialog. The dialog remains available from Mod+/ with the same store and content.
 
 `Mod+/` opens the reference when no modal is open or Settings is in front, and closes it when the reference is in front. While the reference is in front, the Settings command cannot open or close Settings. Held-key repeats are ignored. Recording, pending writes, and a nested confirmation prevent the reference shortcut from closing the dialog.
@@ -43,7 +45,9 @@ Hover an application row to highlight its rounded surface and reveal the edit ic
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The General Settings entry and shell overlay share one declared interaction store. Catalog and configuration updates arrive through injected observable hooks; recording and persistence use injected service callbacks. The shared modal primitive owns top-layer Escape, Tab traversal, and restoration to the invoking control.
+The search icon and empty query hint use the same foreground role; entered text keeps the primary text color.
+
+The top-level Shortcuts section and its shell overlay share one declared interaction store. Catalog and configuration updates arrive through injected observable hooks; recording and persistence use injected service callbacks. The shared modal primitive owns top-layer Escape, Tab traversal, and restoration to the invoking control.
 
 All fixed actions come from the service's observable fixed catalog. Conversation and approval plugins contribute their own actions; this integration contributes shared menu actions. Rows follow locale updates and disappear when their registration is disposed.
 

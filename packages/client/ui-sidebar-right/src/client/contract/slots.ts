@@ -89,6 +89,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     }
     /** Rows of the guide's More menu; the guide shows More only while this list has registrations. */
     'sidebar.right.tab.guide.actions': { kind: 'list'; scope: 'root'; owner: SidebarRightGuideActionsOwnerProps }
+    /**
+     * Header toolbar contributions acting on one previewed file, rendered after
+     * the preview's own controls once the file's Host path is known. Declared by
+     * the tab system so the preview and file-editor packages share one entry.
+     */
+    'sidebar.right.tab.document.actions': {
+      kind: 'list'
+      scope: 'session'
+      owner: { readonly absolutePath: string }
+    }
     /** One provider's guide card, with the standard card as the owner's fallback. */
     'sidebar.right.tab.guide.entry': {
       kind: 'keyed'

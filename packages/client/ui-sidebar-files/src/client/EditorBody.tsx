@@ -33,17 +33,6 @@ declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
   }
 }
 
-declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface SlotMap {
-    /** Text preview header contributions; the file's absolute Host path is the owner share. */
-    'sidebar.right.tab.document.actions': {
-      kind: 'list'
-      scope: 'session'
-      owner: { readonly absolutePath: string }
-    }
-  }
-}
-
 /** The complete-file operations the editor calls for its Session. */
 export interface EditorInjected {
   /** Load a complete UTF-8 document and its save version. */
