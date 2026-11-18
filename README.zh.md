@@ -77,8 +77,11 @@ pnpm dsh web
 
 ### 本地打包 Desktop App（macOS arm64）
 
+修改源码后先重新编译仓库产物，再打包桌面应用：
+
 ```sh
 pnpm install
+pnpm run build
 ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/ \
   pnpm run package:desktop:mac:arm64:unsigned
 ```

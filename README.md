@@ -58,8 +58,11 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 ### Building the Desktop app locally (macOS arm64)
 
+After changing source, rebuild the repository artifacts before packaging the Desktop app:
+
 ```sh
 pnpm install
+pnpm run build
 ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/ \
   pnpm run package:desktop:mac:arm64:unsigned
 ```
