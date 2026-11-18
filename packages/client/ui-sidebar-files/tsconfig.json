@@ -36,6 +36,12 @@
       "path": "../ui-sidebar-right"
     },
     {
+      "path": "../ui-theme/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-conversation/tsconfig.client.json"
+    },
+    {
       "path": "../ui-slots"
     },
     {
