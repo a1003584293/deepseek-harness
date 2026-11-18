@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-notify-command",
   "description": "Run one configured command when the agent waits for the user, ends a turn, or fails",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.2-rc.4",
   "publishConfig": {
     "access": "public"
   },
