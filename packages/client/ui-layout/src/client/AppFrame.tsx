@@ -22,6 +22,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
+import { hasStoredSidebarPreference } from './stores.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
@@ -148,7 +149,7 @@ export function AppFrame({
   useLayoutEffect(() => {
     if (defaultCollapsed.current) return
     defaultCollapsed.current = true
-    if (!('dshDesktop' in globalThis) || layoutInfo.sidebar === 0) return
+    if (!('dshDesktop' in globalThis) || layoutInfo.sidebar === 0 || hasStoredSidebarPreference()) return
     actions.toggleSidebar()
   }, [actions, layoutInfo.sidebar])
   const editorSide = useEditorSide(side => side)

@@ -199,6 +199,28 @@ describe('AppFrame', () => {
     expect(document.title).toBe('DSH Local Build')
   })
 
+  it('keeps an explicitly opened desktop sidebar on mount', () => {
+    vi.stubGlobal('dshDesktop', {})
+    localStorage.setItem('dsh.layout.sidebar', '280')
+    const { frame, sidebarOwner } = mountFrame()
+    expect(sidebarOwner().collapsed).toBe(false)
+    expect(tracks(frame)).toEqual([280, 0])
+  })
+
+  it('keeps an explicitly closed desktop sidebar on mount', () => {
+    vi.stubGlobal('dshDesktop', {})
+    localStorage.setItem('dsh.layout.sidebar', '0')
+    const { sidebarOwner } = mountFrame()
+    expect(sidebarOwner().collapsed).toBe(true)
+  })
+
+  it('collapses the first desktop launch before any choice is stored', () => {
+    vi.stubGlobal('dshDesktop', {})
+    const { sidebarOwner } = mountFrame()
+    expect(sidebarOwner().collapsed).toBe(true)
+    expect(localStorage.getItem('dsh.layout.sidebar')).toBe('0')
+  })
+
   it('follows the selected durable Session title', () => {
     vi.stubEnv('DSH_CLIENT_TITLE', 'Product')
     selectedSessionTitle = 'First'

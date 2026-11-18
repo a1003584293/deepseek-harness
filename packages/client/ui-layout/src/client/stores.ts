@@ -26,6 +26,21 @@ function readSidebarPreference(): number {
   }
 }
 
+/**
+ * Whether this profile has an explicit sidebar open/closed choice. The desktop
+ * compact-start default applies only before such a choice exists.
+ * @returns true when the persisted preference key is present.
+ */
+export function hasStoredSidebarPreference(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try {
+    return localStorage.getItem(SIDEBAR_PREFERENCE_KEY) !== null
+  } catch (error: unknown) {
+    console.warn('layout sidebar preference could not be read:', error)
+    return false
+  }
+}
+
 function rememberSidebarPreference(px: number): void {
   if (typeof localStorage === 'undefined') return
   try {
