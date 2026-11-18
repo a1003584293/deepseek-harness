@@ -12,7 +12,9 @@ import {
   IconBranchOutlineRegular, IconRefreshOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GitDiffScope, GitDiffValue, GitStatusEntry, GitStatusValue } from '@deepseek-ai/dsh-api-workspace-files'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { CodeAppearance } from './monaco-api.ts'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { hasMonaco, MonacoDiff } from './MonacoDiff.tsx'
 import css from './SourceControlBody.module.css'
@@ -39,6 +41,8 @@ export interface GitInjected {
   readonly stage: (paths: readonly string[], signal: AbortSignal) => Promise<GitResult<unknown>>
   /** Unstage paths. */
   readonly unstage: (paths: readonly string[], signal: AbortSignal) => Promise<GitResult<unknown>>
+  /** Live code font and palette from the theme settings. */
+  readonly hooks: { readonly theme: ObservableSnapshot<CodeAppearance> }
 }
 
 /** The body's composed slot props. */
@@ -180,8 +184,11 @@ function DiffView({ diff, t }: { readonly diff: GitDiffValue; readonly t: Transl
  * @param props - the tab's Session, copy, and bound Git operations.
  * @returns the status groups above the selected file's diff.
  */
-export function SourceControlBody({ sessionId, useSessions, readStatus, readDiff, stage, unstage, t }: SourceControlBodyProps): ReactNode {
+export function SourceControlBody({
+  sessionId, useSessions, readStatus, readDiff, stage, unstage, useTheme, t,
+}: SourceControlBodyProps): ReactNode {
   const cwd = useSessions(sessions => sessions.byId[sessionId]?.cwd)
+  const appearance = useTheme(value => value)
   const [status, setStatus] = useState<GitStatusValue | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [selected, setSelected] = useState<{ readonly path: string; readonly scope: GitDiffScope } | undefined>(undefined)
@@ -321,7 +328,7 @@ export function SourceControlBody({ sessionId, useSessions, readStatus, readDiff
             ? <p className={css.note}>{t('git.select')}</p>
             : diffError !== undefined ? <p className={css.error}>{diffError}</p>
               : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
-                : hasMonaco() && !diff.binary && diff.patch.trim().length > 0 ? <MonacoDiff diff={diff} />
+                : hasMonaco() && !diff.binary && diff.patch.trim().length > 0 ? <MonacoDiff diff={diff} appearance={appearance} />
                   : <DiffView diff={diff} t={t} />}
         </div>
       </div>

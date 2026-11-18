@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import { createSnapshotStore, type BoundActions } from '@deepseek-ai/dsh-client-store'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -37,6 +38,7 @@ import {
   EDITOR_ID, EDITOR_KIND, EditFileAction, EditorBody, EditorTitle, editorDefinition, type EditFileActionInjected, type EditorInjected,
 } from './EditorBody.tsx'
 import { createFilesStore } from './store.ts'
+import type { MonacoViewState } from './monaco-api.ts'
 
 export type { SidebarFilesKey } from './locales.ts'
 export type { DirLevel, FilesPaneState, FilesSearchResult, FilesSearchState, FilesState, FilesTreeState, LevelState } from './store.ts'
@@ -71,7 +73,7 @@ const NS = 'sidebarFiles'
  * Required browser services: the tab registry, the keyed seat, the Remote
  * carrier and its namespace, and copy.
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'remote.gitPanel', 'layout']
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'remote.gitPanel', 'layout', 'theme']
 
 /**
  * Client plugin body: register the type, its shortcut, its dictionaries, the
@@ -96,6 +98,13 @@ export function apply(ctx: ClientContext): void {
   // Restored page tabs lose navigation params but keep their content identity;
   // remember the address per content so the editor can reload its file.
   const editorPaths = createSnapshotStore<Record<string, string>>({}, { persist: { name: 'sidebarEditorPaths' } })
+  // Scroll and cursor state per Session path; a reopened editor returns to where
+  // the reader left it, including across an application restart.
+  const editorViewStates = createSnapshotStore<Record<string, MonacoViewState>>({}, { persist: { name: 'sidebarEditorViewStates' } })
+  const themeSource = {
+    getSnapshot: () => ctx.theme.getTheme(),
+    subscribe: (listener: () => void) => ctx.on('theme/change', listener),
+  }
   const accountName = createSnapshotStore<string | undefined>(undefined)
   const accountBalance = createSnapshotStore<string | undefined>(undefined)
   // The account plugin owns the profile and balance presentation; the status
@@ -250,6 +259,7 @@ export function apply(ctx: ClientContext): void {
       return panel
     }
     return {
+      hooks: { theme: themeSource },
       readStatus: signal => git().status(sessionId, signal),
       readDiff: (path, scope, signal) => git().diff(sessionId, path, scope, signal),
       stage: (paths, signal) => git().stage(sessionId, [...paths], signal),
@@ -264,6 +274,16 @@ export function apply(ctx: ClientContext): void {
     { name: 'sidebar.right.pane.tab.title', key: GIT_ID },
     SourceControlTitle,
   )), 'ui-sidebar-files: source control tab title')
+  const readBranch = async (sessionId: SessionId, signal: AbortSignal): Promise<string | null> => {
+    const panel = Reflect.get(ctx.remote, 'gitPanel') as typeof ctx.remote.gitPanel | undefined
+    if (panel === undefined) return null
+    try {
+      const result = await panel.status(sessionId, signal)
+      return result.ok ? result.value.branch : null
+    } catch {
+      return null
+    }
+  }
   // Editable files open as their own page. The document preview stays
   // read-only; a double-click (or the preview's edit action) asks for this tab.
   const editorInjected = (sessionId: SessionId): EditorInjected => ({
@@ -274,6 +294,11 @@ export function apply(ctx: ClientContext): void {
     rememberPath: (contentId, path) => {
       const current = editorPaths.getSnapshot()
       if (current[contentId] !== path) editorPaths.set({ ...current, [contentId]: path })
+    },
+    viewStateFor: path => editorViewStates.getSnapshot()[`${sessionId}\u0000${path}`],
+    rememberViewState: (path, state) => {
+      const key = `${sessionId}\u0000${path}`
+      editorViewStates.set({ ...editorViewStates.getSnapshot(), [key]: state })
     },
     reportSelection: (selection) => {
       const sidebar = ctx.get('sidebarRight') as {
@@ -299,17 +324,8 @@ export function apply(ctx: ClientContext): void {
       } | undefined
       sidebar?.clearPageFile(sessionId, contentId, address)
     },
-    readBranch: async (signal) => {
-      const panel = Reflect.get(ctx.remote, 'gitPanel') as typeof ctx.remote.gitPanel | undefined
-      if (panel === undefined) return null
-      try {
-        const result = await panel.status(sessionId, signal)
-        return result.ok ? result.value.branch : null
-      } catch {
-        return null
-      }
-    },
-    hooks: { accountName, accountBalance },
+    readBranch: signal => readBranch(sessionId, signal),
+    hooks: { accountName, accountBalance, theme: themeSource },
   })
   const editorType = editorDefinition(t)
   ctx.effect(() => ctx.sidebarRightTabs.register(editorType), 'ui-sidebar-files: editor tab type')

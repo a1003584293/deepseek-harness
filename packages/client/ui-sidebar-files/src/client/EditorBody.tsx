@@ -15,8 +15,8 @@ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { FileTypeIcon, IconBranchOutlineRegular, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isEditableFileAddress, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
-import { loadMonacoLanguage, monaco } from './monaco-api.ts'
-import type { MonacoEditor } from './monaco-api.ts'
+import { codeFontFamily, loadMonacoLanguage, monaco } from './monaco-api.ts'
+import type { CodeAppearance, MonacoEditor, MonacoViewState } from './monaco-api.ts'
 import css from './EditorBody.module.css'
 import type {} from './locales.ts'
 
@@ -59,6 +59,10 @@ export interface EditorInjected {
   readonly pathFor: (contentId: string) => string | undefined
   /** Remember the address this editor content opened. */
   readonly rememberPath: (contentId: string, path: string) => void
+  /** Read the scroll and cursor state this Session last left for one path. */
+  readonly viewStateFor: (path: string) => MonacoViewState | undefined
+  /** Remember that state when the editor closes or reloads. */
+  readonly rememberViewState: (path: string, state: MonacoViewState) => void
   /** Publish the current whole-line code selection to the composer indicator. */
   readonly reportSelection: (selection: SidebarTextSelection) => void
   /** Clear a selection that belongs to this editor. */
@@ -69,10 +73,11 @@ export interface EditorInjected {
   readonly clearFile: (contentId: string, address: string) => void
   /** Read the workspace checkout's current branch for the status line. */
   readonly readBranch: (signal: AbortSignal) => Promise<string | null>
-  /** Live account display name and recharge balance for the status line. */
+  /** Live account facts for the status line and the code font and palette. */
   readonly hooks: {
     readonly accountName: ObservableSnapshot<string | undefined>
     readonly accountBalance: ObservableSnapshot<string | undefined>
+    readonly theme: ObservableSnapshot<CodeAppearance>
   }
 }
 
@@ -175,19 +180,15 @@ function languageOf(path: string): string {
   return known[extension] ?? 'plaintext'
 }
 
-/** True when the app is running the dark theme. */
-function darkTheme(): boolean {
-  return document.body.hasAttribute('data-ds-dark-theme')
-}
-
 /**
  * Render one editable document.
  * @param props - the tab occurrence, namespace copy, and complete-file operations.
  * @returns the editor header above the Monaco surface.
  */
 export function EditorBody({
-  sessionId, useSessions, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, reportSelection, clearSelection,
-  publishFile, clearFile, readBranch, useAccountName, useAccountBalance, renderFactorySlot, t,
+  sessionId, useSessions, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, viewStateFor, rememberViewState,
+  reportSelection, clearSelection, publishFile, clearFile, readBranch, useAccountName, useAccountBalance, useTheme,
+  renderFactorySlot, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.navigation.params?.path ?? pathFor(tab.contentId) ?? ''
@@ -197,6 +198,7 @@ export function EditorBody({
   const workspacePath = useSessions(state => state.byId[sessionId]?.cwd)
   const accountName = useAccountName(value => value)
   const accountBalance = useAccountBalance(value => value)
+  const appearance = useTheme(value => value)
   const [branch, setBranch] = useState<string>()
   const [document, setDocument] = useState<WorkspaceFileDocument>()
   const [text, setText] = useState('')
@@ -225,6 +227,12 @@ export function EditorBody({
   const saveRef = useRef<() => void>(() => {})
   const readBranchRef = useRef(readBranch)
   readBranchRef.current = readBranch
+  const viewStateForRef = useRef(viewStateFor)
+  viewStateForRef.current = viewStateFor
+  const rememberViewStateRef = useRef(rememberViewState)
+  rememberViewStateRef.current = rememberViewState
+  const appearanceRef = useRef(appearance)
+  appearanceRef.current = appearance
 
   useEffect(() => { setLanguage(languageOf(path)) }, [path])
 
@@ -339,18 +347,23 @@ export function EditorBody({
     void loadMonacoLanguage(initialLanguage).then(() => {
       if (cancelled) return
       model = api.editor.createModel(document.text, initialLanguage)
+      const appearanceNow = appearanceRef.current
       const created = api.editor.create(host, {
         model,
         automaticLayout: true,
         readOnly: false,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        fontSize: 12,
+        fontSize: appearanceNow.fontSizes.code,
+        fontFamily: codeFontFamily(appearanceNow),
+        scrollbar: { verticalScrollbarSize: 16, horizontalScrollbarSize: 16 },
         tabSize: 2,
-        theme: darkTheme() ? 'vs-dark' : 'vs',
+        theme: appearanceNow.active.colorScheme === 'dark' ? 'vs-dark' : 'vs',
       })
       editor = created
       editorRef.current = created
+      const savedView = viewStateForRef.current(path)
+      if (savedView !== undefined) created.restoreViewState(savedView)
       change = created.onDidChangeModelContent(() => {
         const value = created.getValue()
         setText(value)
@@ -380,12 +393,28 @@ export function EditorBody({
       host.removeEventListener('keydown', keydown, true)
       select?.dispose()
       change?.dispose()
+      const savedView = editor?.saveViewState()
+      if (savedView !== null && savedView !== undefined) rememberViewStateRef.current(path, savedView)
       editor?.dispose()
       model?.dispose()
       if (fileAddress !== '') clearSelection({ sessionId, address: fileAddress })
       editorRef.current = undefined
     }
   }, [document, path])
+
+  // Monaco's theme is global to the shell-owned vendor: one change reaches the
+  // editor and the source-control diff together, while font changes update the
+  // live editor without rebuilding its model or losing the view state.
+  useEffect(() => {
+    monaco()?.editor.setTheme(appearance.active.colorScheme === 'dark' ? 'vs-dark' : 'vs')
+  }, [appearance.active.colorScheme])
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({
+      fontSize: appearance.fontSizes.code,
+      fontFamily: codeFontFamily(appearance),
+    })
+  }, [appearance.fontSizes.code, appearance.fontFamilies.code])
 
   if (path === '') {
     return (

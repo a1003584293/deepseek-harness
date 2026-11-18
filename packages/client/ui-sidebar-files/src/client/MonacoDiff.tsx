@@ -9,7 +9,8 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { GitDiffValue } from '@deepseek-ai/dsh-api-workspace-files'
-import { monaco } from './monaco-api.ts'
+import { codeFontFamily, monaco } from './monaco-api.ts'
+import type { CodeAppearance } from './monaco-api.ts'
 import css from './MonacoDiff.module.css'
 
 /** The shell-owned Monaco vendor, if the Web entry mounted it. */
@@ -59,9 +60,10 @@ export function parseUnifiedPatch(patch: string): { original: string; modified: 
 /**
  * Render one patch as a read-only Monaco diff.
  * @param props.diff - the selected file's patch and scope.
+ * @param props.appearance - the code font and palette from the theme settings.
  * @returns the editor host, or nothing for a binary patch.
  */
-export function MonacoDiff({ diff }: { readonly diff: GitDiffValue }): ReactNode {
+export function MonacoDiff({ diff, appearance }: { readonly diff: GitDiffValue; readonly appearance: CodeAppearance }): ReactNode {
   const hostRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const api = monaco()
@@ -77,8 +79,10 @@ export function MonacoDiff({ diff }: { readonly diff: GitDiffValue }): ReactNode
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      fontSize: 12,
-      theme: document.body.hasAttribute('data-ds-dark-theme') ? 'vs-dark' : 'vs',
+      fontSize: appearance.fontSizes.code,
+      fontFamily: codeFontFamily(appearance),
+      scrollbar: { verticalScrollbarSize: 16, horizontalScrollbarSize: 16 },
+      theme: appearance.active.colorScheme === 'dark' ? 'vs-dark' : 'vs',
     })
     editor.setModel({ original: originalModel, modified: modifiedModel })
     return () => {
@@ -86,6 +90,6 @@ export function MonacoDiff({ diff }: { readonly diff: GitDiffValue }): ReactNode
       originalModel.dispose()
       modifiedModel.dispose()
     }
-  }, [diff])
+  }, [diff, appearance.fontSizes.code, appearance.fontFamilies.code, appearance.active.colorScheme])
   return <div ref={hostRef} className={css.host} data-monaco-diff />
 }

@@ -81,7 +81,9 @@
   min-height: 0;
   padding: 10px;
   color: var(--dsw-alias-label-primary);
-  font: 12px/1.5 var(--dsw-font-family-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-family-code, var(--dsw-font-family-mono, ui-monospace, monospace));
+  font-size: var(--dsh-code-font-size, 11px);
+  line-height: 1.5;
   background: var(--dsw-alias-bg-base);
   border: 0;
   outline: none;
