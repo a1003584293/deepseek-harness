@@ -28,6 +28,21 @@
   min-height: calc(22px + var(--dsh-content-font-delta-secondary, 0px));
 }
 
+/* Session, workspace, branch, and account facts below the readings. The
+   occupant owns its whole row and returns nothing while the file editor's
+   footer already shows the same facts. */
+.factsRow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  margin-top: 2px;
+}
+
+.factsRow:empty {
+  display: none;
+}
+
 .hero .dock:empty {
   display: none;
 }

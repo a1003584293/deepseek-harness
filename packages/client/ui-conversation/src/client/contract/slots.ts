@@ -340,6 +340,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.composer.dock': { kind: 'list'; scope: 'session' }
     /**
+     * Session facts below the composer's readings. The occupant returns nothing while its
+     * richer footer is visible, so the two surfaces never duplicate the same facts.
+     */
+    'conversation.composer.facts': { kind: 'single'; scope: 'session' }
+    /**
      * Compact controls at the left of the composer tool row; fixed overlays must portal to the
      * document body because the docked composer contains them.
      */
@@ -669,7 +674,7 @@ export type ComposerBarProps =
     | 'conversation.input.permission'
     | 'conversation.input.left' | 'conversation.input.plan'
     | 'conversation.input.right' | 'conversation.input.model' | 'conversation.input.activity'
-    | 'conversation.composer.dock'
+    | 'conversation.composer.dock' | 'conversation.composer.facts'
   >
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>

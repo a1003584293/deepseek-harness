@@ -29,6 +29,8 @@ import { FilesTitle } from '../src/client/FilesTitle.tsx'
 import { NavigatorToggle } from '../src/client/NavigatorToggle.tsx'
 import { GIT_ID, SourceControlPage, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
 import { EDITOR_ID, EditFileAction, EditorBody, EditorTitle } from '../src/client/EditorBody.tsx'
+import { SessionFacts } from '../src/client/SessionFacts.tsx'
+import type { SessionFactsInjected } from '../src/client/SessionFacts.tsx'
 import { en, ja, zh, es, fr, de, ru, pt } from '../src/client/locales.ts'
 import type { createFilesStore } from '../src/client/store.ts'
 
@@ -87,6 +89,7 @@ async function boot() {
     commandTarget: vi.fn(), openTabFromTarget: vi.fn(),
     isExpanded: vi.fn(() => true), toggleExpanded: vi.fn(),
     openTabs, mounted, active: vi.fn(() => undefined), close: vi.fn(), openResource: vi.fn(),
+    openTabIn: vi.fn(), openResourceIn: vi.fn(),
   }
   const commands: ShortcutCommand[] = []
   ctx.provide('shortcuts', { register: (command: ShortcutCommand) => {
@@ -97,6 +100,12 @@ async function boot() {
   ctx.provide('layout', { editorSide: createSnapshotStore<'left' | 'right'>('right') } as never)
   ctx.provide('sidebarRight', sidebar as never)
   ctx.provide('sidebarRightTabs', tabs as never)
+  ctx.provide('theme', {
+    getTheme: () => ({
+      preference: 'light', fontSizes: { text: 14, code: 12, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' },
+      active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0,
+    }),
+  } as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
   ctx.provide('remote', { workspaceFiles, gitPanel, $host: { home: HOME, isLoopback: true } } as never)
@@ -145,7 +154,57 @@ describe('ui-sidebar-files apply', () => {
       h.setAccount({ displayName: 'Other', balanceText: '¥1,234.56 <$0.01' })
       expect(face.hooks.accountName.getSnapshot()).toBe('Other')
       expect(face.hooks.accountBalance.getSnapshot()).toBe('¥1,234.56 <$0.01')
+      expect(face.hooks.theme.getSnapshot().fontSizes.code).toBe(12)
+      face.rememberViewState('notes.md', { scrollTop: 500 })
+      expect(face.viewStateFor('notes.md')).toEqual({ scrollTop: 500 })
+      // The key includes the Session, so another Session's identical path is a different file.
+      const other = page.inject!('other' as SessionId, {}) as EditorInjected
+      expect(other.viewStateFor('notes.md')).toBeUndefined()
     } finally { await h.fiber.dispose() }
+  })
+
+  it('feeds composer facts the account hooks and Sessions with an open editor', async () => {
+    const h = await boot()
+    try {
+      const entry = h.registered.find(candidate => candidate.name === 'conversation.composer.facts')!
+      const face = entry.inject!(SESSION, {}) as SessionFactsInjected
+      expect(face.hooks.accountName.getSnapshot()).toBe('User')
+      expect(face.hooks.accountBalance.getSnapshot()).toBe('¥2.33')
+      expect(face.hooks.editorSessions.getSnapshot().has(SESSION)).toBe(false)
+      h.sidebar.openTabs.set([{ sessionId: SESSION, tabId: 'tab-1', kind: 'file-editor', contentId: 'content-1' }])
+      expect(face.hooks.editorSessions.getSnapshot().has(SESSION)).toBe(true)
+    } finally { await h.fiber.dispose() }
+  })
+
+  it('opens composer file references in the editor and non-text files in the preview', async () => {
+    const h = await boot()
+    try {
+      h.ctx.emit('conversation/file-reference', { sessionId: SESSION, path: '/work/app/notes.md' })
+      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: '/work/app/notes.md' } })
+      h.ctx.emit('conversation/file-reference', { sessionId: SESSION, path: '/work/app/report.pdf' })
+      expect(h.sidebar.openResourceIn).toHaveBeenCalledWith(SESSION, 'dsh-resource://file/session/files-session//work/app/report.pdf')
+    } finally { await h.fiber.dispose() }
+  })
+
+  it('holds Desktop open requests until a Session is on screen and releases the bridge', async () => {
+    const listeners: ((paths: readonly string[]) => void)[] = []
+    const unsubscribe = vi.fn()
+    vi.stubGlobal('dshDesktop', {
+      protocolVersion: 1,
+      openFiles: { subscribe: (listener: (paths: readonly string[]) => void) => { listeners.push(listener); return unsubscribe } },
+    })
+    const h = await boot()
+    try {
+      listeners[0]!(['/work/app/notes.md', '/work/app/report.pdf'])
+      expect(h.sidebar.openTabIn).not.toHaveBeenCalled()
+      h.sidebar.mounted.set(SESSION)
+      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: '/work/app/notes.md' } })
+      expect(h.sidebar.openResourceIn).toHaveBeenCalledWith(SESSION, 'dsh-resource://file/session/files-session//work/app/report.pdf')
+    } finally {
+      await h.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+    expect(unsubscribe).toHaveBeenCalledOnce()
   })
 
   it('opens files for the command target and refuses without a selected Session', async () => {
@@ -331,17 +390,19 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.right.pane.tab', EDITOR_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', EDITOR_ID, undefined],
       ['sidebar.right.tab.document.actions', undefined, 'sidebarFiles'],
+      ['conversation.composer.facts', undefined, undefined],
       ['shell.overlay', undefined, 'sidebarFiles'],
     ])
     expect(slots.registerFactory.mock.calls.map(([options]) => [options.name, options.scope]))
       .toEqual([['sidebar.files.tree', 'root'], ['sidebar.files.navigator', 'session'], ['sidebar.files.navigator.toggle', 'session']])
-    const [tree, factory, toggle, body, title, gitBody, gitTitle, editorBody, editorTitle, editAction, palette] = registered
+    const [tree, factory, toggle, body, title, gitBody, gitTitle, editorBody, editorTitle, editAction, facts, palette] = registered
     expect([
       factory?.component, toggle?.component, body?.component, title?.component,
-      gitBody?.component, gitTitle?.component, editorBody?.component, editorTitle?.component, editAction?.component, palette?.component,
+      gitBody?.component, gitTitle?.component, editorBody?.component, editorTitle?.component, editAction?.component,
+      facts?.component, palette?.component,
     ]).toEqual([
       FileNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlPage, SourceControlTitle,
-      EditorBody, EditorTitle, EditFileAction, QuickOpen,
+      EditorBody, EditorTitle, EditFileAction, SessionFacts, QuickOpen,
     ])
     expect(tree?.component).toBe(FileTree)
     expect(slots.registerFactory.mock.calls[0]?.[0]).toMatchObject({ slots: { accessory: { scope: 'root' } } })

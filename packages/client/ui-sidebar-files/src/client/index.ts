@@ -38,6 +38,8 @@ import {
 import {
   EDITOR_ID, EDITOR_KIND, EditFileAction, EditorBody, EditorTitle, editorDefinition, type EditFileActionInjected, type EditorInjected,
 } from './EditorBody.tsx'
+import { SessionFacts } from './SessionFacts.tsx'
+import type { SessionFactsInjected } from './SessionFacts.tsx'
 import { createFilesStore } from './store.ts'
 import type { MonacoViewState } from './monaco-api.ts'
 
@@ -107,12 +109,29 @@ export function apply(ctx: ClientContext): void {
   // Scroll and cursor state per Session path; a reopened editor returns to where
   // the reader left it, including across an application restart.
   const editorViewStates = createSnapshotStore<Record<string, MonacoViewState>>({}, { persist: { name: 'sidebarEditorViewStates' } })
+  // Sessions with a file editor tab open; the composer hides its facts row while
+  // the editor's own footer can show them.
+  const editorSessions = createSnapshotStore<ReadonlySet<SessionId>>(new Set())
   const themeSource = {
     getSnapshot: () => ctx.theme.getTheme(),
     subscribe: (listener: () => void) => ctx.on('theme/change', listener),
   }
   const accountName = createSnapshotStore<string | undefined>(undefined)
   const accountBalance = createSnapshotStore<string | undefined>(undefined)
+  ctx.effect(() => {
+    const sync = (): void => {
+      const next = new Set<SessionId>()
+      for (const tab of ctx.sidebarRight.openTabs.getSnapshot()) {
+        if (tab.kind === EDITOR_KIND) next.add(tab.sessionId)
+      }
+      const current = editorSessions.getSnapshot()
+      if (current.size === next.size && [...next].every(sessionId => current.has(sessionId))) return
+      editorSessions.set(next)
+    }
+    const unsubscribe = ctx.sidebarRight.openTabs.subscribe(sync)
+    sync()
+    return unsubscribe
+  }, 'ui-sidebar-files: open editor sessions')
   // The account plugin owns the profile and balance presentation; the status
   // line renders its display text unchanged so cents truncate exactly as the
   // Account settings rows do. The account package cannot be a type dependency
@@ -352,6 +371,15 @@ export function apply(ctx: ClientContext): void {
       openEditor: (path) => { ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } }) },
     }),
   }, EditFileAction)), 'ui-sidebar-files: preview edit action')
+  // The composer's facts row mirrors the editor footer, but only while no file
+  // editor tab is open: the footer already owns these facts when it shows.
+  const factsInjected = (sessionId: SessionId): SessionFactsInjected => ({
+    hooks: { accountName, accountBalance, editorSessions },
+    readBranch: signal => readBranch(sessionId, signal),
+  })
+  ctx.effect(() => ctx.slots.inject('conversation.composer.facts', () => ctx.slots.register({
+    name: 'conversation.composer.facts', inject: factsInjected,
+  }, SessionFacts)), 'ui-sidebar-files: composer facts')
 
   // One opener for files the composer receives and files the Desktop shell was
   // asked to open: text-like files get the Monaco page, everything else the

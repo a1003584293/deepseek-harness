@@ -456,6 +456,7 @@ describe('ConversationRoot resident composer', () => {
       'conversation.input.left',
       'conversation.input.right',
       'conversation.composer.dock',
+      'conversation.composer.facts',
     ])
     const dispatchCount = () => b.slotCalls.filter(key => childKeys.has(key)).length
     const before = dispatchCount()

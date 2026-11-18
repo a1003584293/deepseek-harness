@@ -1,0 +1,58 @@
+/* Composer session facts, matching the file editor footer's rhythm. */
+.row {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.branch {
+  display: inline-flex;
+  flex: 0 1 auto;
+  max-width: 32%;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.branch > svg {
+  flex: none;
+}
+
+.branchLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.item {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance {
+  flex-shrink: 0;
+}
