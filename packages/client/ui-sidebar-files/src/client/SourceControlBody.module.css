@@ -149,11 +149,11 @@
   font-weight: 600;
 }
 
-.letter[data-letter='M'] { color: var(--dsw-alias-status-warning); }
+.letter[data-letter='M'] { color: var(--dsw-alias-state-warn-primary); }
 .letter[data-letter='A'],
-.letter[data-letter='U'] { color: var(--dsw-alias-status-success); }
-.letter[data-letter='D'] { color: var(--dsw-alias-status-danger); }
-.letter[data-letter='R'] { color: var(--dsw-alias-status-info); }
+.letter[data-letter='U'] { color: var(--dsw-alias-state-success-primary); }
+.letter[data-letter='D'] { color: var(--dsw-alias-state-error-primary); }
+.letter[data-letter='R'] { color: var(--dsw-alias-state-business-primary); }
 
 .path {
   overflow: hidden;
@@ -225,7 +225,7 @@
 .error {
   margin: 0;
   padding: 8px 10px;
-  color: var(--dsw-alias-status-danger);
+  color: var(--dsw-alias-state-error-primary);
   font-size: 12px;
   word-break: break-word;
 }

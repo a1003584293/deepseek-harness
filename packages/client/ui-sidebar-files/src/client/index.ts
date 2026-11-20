@@ -33,7 +33,7 @@ import { QuickOpen, type QuickOpenInjected } from './QuickOpen.tsx'
 import { expandQuickOpenPath, quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
 import { createSearchPreferenceBook, SEARCH_PREFERENCES_KEY } from './search-preferences.ts'
 import {
-  GIT_ID, SourceControlPage, SourceControlTitle, sourceControlDefinition, type GitInjected,
+  GIT_ID, GIT_KIND, SourceControlPage, SourceControlTitle, sourceControlDefinition, type GitInjected,
 } from './SourceControlBody.tsx'
 import {
   EDITOR_ID, EDITOR_KIND, EditFileAction, EditorBody, EditorTitle, editorDefinition, type EditFileActionInjected, type EditorInjected,
@@ -282,6 +282,26 @@ export function apply(ctx: ClientContext): void {
   })
   ctx.effect(() => ctx.sidebarRightTabs.register(filesDefinition(t)), 'ui-sidebar-files: files type')
   ctx.effect(() => ctx.sidebarRightTabs.register(sourceControlDefinition(t)), 'ui-sidebar-files: source control type')
+  // Configurable counterpart to the header button: Cmd/Ctrl+Shift+G shows the
+  // source-control page. Reopening focuses it instead of adding another tab.
+  ctx.inject(['shortcuts'], (ctx) => {
+    ctx.effect(() => ctx.shortcuts.register({
+      id: 'workspace.sourceControl' as ShortcutCommandId,
+      label: () => t('git.title'), aliases: ['source control', 'git', 'changes'],
+      defaults: {
+        'desktop:macos': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+        'desktop:windows': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+        'desktop:linux': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+        'web:macos': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+        'web:windows': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+        'web:linux': { code: 'KeyG', modifiers: ['primary', 'shift'] },
+      },
+      regions: ['page', 'editable', 'terminal'], modals: [],
+      resolve: ({ target }) => ctx.sidebarRight.commandTarget(target) === undefined
+        ? { status: 'blocked', reason: t('shortcut.noSession') }
+        : { status: 'handled', run: () => { ctx.sidebarRight.openTab(GIT_KIND) } },
+    }), 'ui-sidebar-files: source control shortcut')
+  })
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-files: dictionaries')
 
   ctx.effect(() => ctx.slots.registerFactory({
