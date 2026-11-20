@@ -85,7 +85,10 @@ async function boot(shortcuts: Partial<Shortcuts> = {}) {
     catalog: { getSnapshot: () => SHORTCUT_CATALOG, subscribe: () => () => {} }, ...shortcuts } as never)
   ctx.provide('layout', layout as never)
   ctx.provide('resources', resources as never)
-  ctx.provide('sessions', { retain: vi.fn(() => ({ ready: Promise.resolve(), release: vi.fn() })) } as never)
+  ctx.provide('sessions', {
+    retain: vi.fn(() => ({ ready: Promise.resolve(), release: vi.fn() })),
+    list: createSnapshotStore({ ids: [SESSION], byId: { [SESSION]: { cwd: '/home/me' } }, phase: 'ready' }),
+  } as never)
   ctx.provide('uiSession', { adapter: { current } } as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
@@ -389,6 +392,7 @@ it('closes captured pane tabs and rechecks tabs moved or closed while their menu
   expect(right.source.getSnapshot().map(action => [action.id, action.icon !== undefined])).toEqual([
     ['sidebar.close/close', true], ['sidebar.close/others', false], ['sidebar.close/right', false],
     ['sidebar.close/copyName', false], ['sidebar.close/copyNameWithExtension', false],
+    ['sidebar.close/copyAbsolutePath', false], ['sidebar.close/copyRelativePath', false],
   ])
   h.ctx.sidebarRight.closeIn(SESSION, second.id)
   right.select('sidebar.close/right')
@@ -434,5 +438,33 @@ it('copies a file tab name with or without its final extension', async () => {
   const withExtension = h.menus.resolve(target)
   withExtension.select('sidebar.close/copyNameWithExtension')
   await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('notes.ts') })
+  instance.clearPersisted()
+})
+
+it('copies absolute and relative paths, keeping a non-project file absolute', async () => {
+  const h = await boot()
+  onTestFinished(async () => { await h.ctx.fiber.dispose() })
+  vi.stubGlobal('document', { activeElement: null, querySelectorAll: () => [] })
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  const writeText = vi.fn<() => Promise<void>>(() => Promise.resolve())
+  vi.stubGlobal('navigator', { clipboard: { writeText } })
+  const handle = h.seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+  const instance = handle.create(SESSION)
+  instance.clearPersisted()
+  instance.actions.open(SESSION)
+  const add = (contentId: string, title: string) => {
+    instance.actions.openContent(SESSION, { kind: 'text', contentId, title }, () => {})
+    const surface = instance.getSnapshot().bySession[SESSION]!
+    const tab = Object.values(surface.layout.tabs).find(candidate => candidate.title === title)!
+    return { kind: 'tab', value: { sessionId: SESSION, paneId: surface.layout.activePaneId, tab } } as const
+  }
+  const local = add('dsh-resource://file/session/s/notes.ts', 'notes.ts')
+  h.menus.resolve(local).select('sidebar.close/copyAbsolutePath')
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('/home/me/notes.ts') })
+  h.menus.resolve(local).select('sidebar.close/copyRelativePath')
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('notes.ts') })
+  const outside = add('dsh-resource://file/session/s//opt/out.py', 'out.py')
+  h.menus.resolve(outside).select('sidebar.close/copyRelativePath')
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledWith('/opt/out.py') })
   instance.clearPersisted()
 })

@@ -1,6 +1,7 @@
 import { IconCloseOutlineRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { fileLeafName, fileStem } from './file-name.ts'
+import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import { TabMenuContent } from './shell/TabMenuContent.tsx'
 import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /**
@@ -142,11 +143,24 @@ export function apply(ctx: ClientContext): void {
     name: 'contextMenu.icon', key: 'sidebar.close',
   }, IconCloseOutlineRegular)), 'sidebar: menu icon')
   // Copies the file tab's leaf name; the second entry keeps its extension.
-  const copyFileName = async (path: string, withExtension: boolean): Promise<void> => {
-    const leaf = fileLeafName(path)
-    const text = withExtension ? leaf : fileStem(leaf)
+  const copyText = async (text: string): Promise<void> => {
     const copied = await writeClipboard(text)
     ctx.contextMenus.notify(copied ? t('menu.copiedName', { name: text }) : t('menu.copyNameFailed'), copied)
+  }
+  const copyFileName = async (path: string, withExtension: boolean): Promise<void> => {
+    const leaf = fileLeafName(path)
+    await copyText(withExtension ? leaf : fileStem(leaf))
+  }
+  const copyPath = async (sessionId: SessionId, path: string, relative: boolean): Promise<void> => {
+    const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+    const absolute = resolveWorkspacePath(cwd, path)
+    if (!relative || cwd === undefined) {
+      await copyText(absolute)
+      return
+    }
+    const root = cwd.replace(/\\/g, '/').replace(/\/+$/, '')
+    const normalized = absolute.replace(/\\/g, '/')
+    await copyText(normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : absolute)
   }
   ctx.effect(() => ctx.contextMenus.register({
     id: 'sidebar.close', target: 'tab', order: 100,
@@ -167,6 +181,8 @@ export function apply(ctx: ClientContext): void {
         ...filePath === undefined ? [] : [
           { id: 'copyName', separatorBefore: true, label: t('menu.copyFileName'), run: () => { void copyFileName(filePath, false) } },
           { id: 'copyNameWithExtension', label: t('menu.copyFileNameWithExtension'), run: () => { void copyFileName(filePath, true) } },
+          { id: 'copyAbsolutePath', label: t('menu.copyAbsolutePath'), run: () => { void copyPath(sessionId, filePath, false) } },
+          { id: 'copyRelativePath', label: t('menu.copyRelativePath'), run: () => { void copyPath(sessionId, filePath, true) } },
         ],
       ]
     },
