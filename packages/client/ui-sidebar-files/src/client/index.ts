@@ -271,6 +271,15 @@ export function apply(ctx: ClientContext): void {
           // The files shortcut always returns the pane's navigator to the tree,
           // including when source-control changes currently fill it.
           const instance = instances.get(target.sessionId)
+          const active = ctx.sidebarRight.active()
+          if (active?.kind === GIT_DIFF_KIND) {
+            // A diff is its own tab; returning to files closes it and reveals the
+            // file tab and navigator underneath rather than opening another page.
+            instance?.actions.sourceControlShown(target.paneId, false)
+            instance?.actions.shown(target.paneId, true)
+            ctx.sidebarRight.close(active.id)
+            return
+          }
           if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {
             instance.actions.sourceControlShown(target.paneId, false)
             instance.actions.shown(target.paneId, true)
@@ -278,7 +287,6 @@ export function apply(ctx: ClientContext): void {
           }
           // A second press on the files page closes it, so the shortcut toggles
           // instead of only ever revealing the tree.
-          const active = ctx.sidebarRight.active()
           if (active !== undefined && active.kind === FILES_KIND) {
             ctx.sidebarRight.close(active.id)
             return
@@ -381,10 +389,12 @@ export function apply(ctx: ClientContext): void {
   // A selected patch is its own tab, so opening a diff never replaces the file
   // tab it was reviewed from.
   ctx.effect(() => ctx.sidebarRightTabs.register(gitDiffDefinition(t)), 'ui-sidebar-files: source control diff type')
-  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
-    { name: 'sidebar.right.pane.tab', key: GIT_DIFF_ID, locale: NS, inject: gitInjected },
-    SourceControlDiffBody,
-  )), 'ui-sidebar-files: source control diff body')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
+    name: 'sidebar.right.pane.tab', key: GIT_DIFF_ID, locale: NS, store,
+    inject: (sessionId: SessionId) => ({
+      ...gitInjected(sessionId), sourceControl: sourceControlFace(sessionId),
+    }),
+  }, SourceControlDiffBody)), 'ui-sidebar-files: source control diff body')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
     { name: 'sidebar.right.pane.tab.title', key: GIT_DIFF_ID },
     SourceControlDiffTitle,

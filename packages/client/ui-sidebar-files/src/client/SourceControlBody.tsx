@@ -8,7 +8,7 @@
  */
 import { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconBranchOutlineRegular, IconRefreshOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -18,6 +18,9 @@ import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sideb
 import type { CodeAppearance } from './monaco-api.ts'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { hasMonaco, MonacoDiff } from './MonacoDiff.tsx'
+import { SourceControlNavigator } from './SourceControlNavigator.tsx'
+import type { SourceControlFace } from './face.ts'
+import type { createFilesStore } from './store.ts'
 import css from './SourceControlBody.module.css'
 import type {} from './locales.ts'
 
@@ -51,6 +54,13 @@ export type SourceControlBodyProps =
   & PropsRuntime<'sidebar.right.pane.tab'>
   & PropsLocale<'sidebarFiles'>
   & InjectFace<GitInjected>
+
+/** The diff tab also owns the files store so its changes navigator stays mounted. */
+export type SourceControlDiffBodyProps =
+  & PropsRuntime<'sidebar.right.pane.tab'>
+  & PropsStore<ReturnType<typeof createFilesStore>>
+  & PropsLocale<'sidebarFiles'>
+  & InjectFace<GitInjected & { readonly sourceControl?: SourceControlFace }>
 
 /** Definition of the source-control page type. */
 export function sourceControlDefinition(t: TranslateNS<'sidebarFiles'>): SidebarRightTabDefinition {
@@ -356,7 +366,9 @@ export function SourceControlDiffTitle({ useTabInfo }: PropsRuntime<'sidebar.rig
 }
 
 /** One selected patch, opened beside the file it reviews rather than replacing that file's tab. */
-export function SourceControlDiffBody({ useTabInfo, readDiff, useTheme, t }: SourceControlBodyProps): ReactNode {
+export function SourceControlDiffBody({
+  useTabInfo, useStore, readDiff, useTheme, sourceControl, sessionId, t,
+}: SourceControlDiffBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const params = tab.navigation.params
   const path = params?.path ?? ''
@@ -374,13 +386,20 @@ export function SourceControlDiffBody({ useTabInfo, readDiff, useTheme, t }: Sou
     }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)) })
     return () => { controller.abort() }
   }, [path, scope, readDiff])
-  if (error !== undefined) return <div className={css.page} data-source-control-diff><p className={css.error} role="alert">{error}</p></div>
-  if (diff === undefined) return <div className={css.page} data-source-control-diff><p className={css.note}>{t('git.loading')}</p></div>
-  return <div className={css.page} data-source-control-diff>
-    <div className={css.diffPane}>
-      {hasMonaco() && !diff.binary && diff.patch.trim().length > 0
+  const navigator = sourceControl === undefined ? null : <div className={css.diffNavigator}>
+    <SourceControlNavigator
+      useTabInfo={useTabInfo} useStore={useStore} sessionId={sessionId} t={t} sourceControl={sourceControl}
+    />
+  </div>
+  const content = error !== undefined ? <p className={css.error} role="alert">{error}</p>
+    : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
+      : hasMonaco() && !diff.binary && diff.patch.trim().length > 0
         ? <MonacoDiff diff={diff} appearance={appearance} />
-        : <DiffView diff={diff} t={t} />}
+        : <DiffView diff={diff} t={t} />
+  return <div className={css.page} data-source-control-diff>
+    <div className={css.diffLayout}>
+      {navigator}
+      <div className={css.diffPane}>{content}</div>
     </div>
   </div>
 }

@@ -6,7 +6,10 @@ import type { GitDiffScope, GitStatusEntry, GitStatusValue } from '@deepseek-ai/
 import { IconBranchOutlineRegular, IconRefreshOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './SourceControlBody.module.css'
 
-type SourceControlNavigatorProps = FactoryComponentPropsOf<'sidebar.files.navigator'>
+type SourceControlNavigatorProps = Pick<
+  FactoryComponentPropsOf<'sidebar.files.navigator'>,
+  'useTabInfo' | 'useStore' | 'sessionId' | 't' | 'sourceControl'
+>
 
 function staged(entry: GitStatusEntry): boolean { return entry.index !== ' ' && entry.index !== '?' }
 function unstaged(entry: GitStatusEntry): boolean { return entry.worktree !== ' ' || entry.index === '?' }
