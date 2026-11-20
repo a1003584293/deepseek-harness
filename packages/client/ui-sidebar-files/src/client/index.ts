@@ -291,12 +291,10 @@ export function apply(ctx: ClientContext): void {
           const instance = instances.get(target.sessionId)
           const active = ctx.sidebarRight.active()
           if (active?.kind === GIT_DIFF_KIND) {
-            // Keep the diff tab and reveal the existing file tab's tree. Closing
-            // the diff would lose the comparison the reader is inspecting.
+            // Keep the diff tab and put the file tree in its own page. Jumping to
+            // an arbitrary open file tab hid the tree the shortcut promises.
             instance?.actions.sourceControlShown(target.paneId, false)
-            const fileTab = ctx.sidebarRight.tabsIn(target.sessionId).find(tab =>
-              tab.id !== active.id && (tab.kind === FILES_KIND || tab.kind === EDITOR_KIND))
-            if (fileTab !== undefined) ctx.sidebarRight.focus(fileTab.id)
+            ctx.sidebarRight.openTabFromTarget(FILES_KIND, target)
             return
           }
           if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {
