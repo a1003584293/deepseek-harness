@@ -373,6 +373,12 @@
   user-select: none;
 }
 
+/* The close control is painted over the chip's last 24px; reserve that width
+   in the chip's own padding so a full title never runs under it. */
+.tab:has(.tabClose) {
+  padding-right: 28px;
+}
+
 /* A flex row with a 5px gap, so an embedder's leading glyph (`renderTabTitle`)
    centres on the text's line rather than sitting on its baseline and keeps
    one distance from it. The clip is horizontal in intent; the line box must

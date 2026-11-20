@@ -66,7 +66,7 @@ export function parseUnifiedPatch(patch: string): { original: string; modified: 
 export function MonacoDiff({ diff, appearance, inline = false }: {
   readonly diff: GitDiffValue
   readonly appearance: CodeAppearance
-  /** Use one changed column when the diff shares a narrow dock with its tree. */
+  /** Use one changed column instead of side-by-side editors. */
   readonly inline?: boolean
 }): ReactNode {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -81,6 +81,9 @@ export function MonacoDiff({ diff, appearance, inline = false }: {
       readOnly: true,
       originalEditable: false,
       renderSideBySide: !inline,
+      // Monaco otherwise collapses to one editor in a narrow dock even when
+      // side-by-side was requested. The source-control layout keeps two editors.
+      useInlineViewWhenSpaceIsLimited: false,
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
