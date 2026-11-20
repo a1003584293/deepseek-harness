@@ -99,12 +99,12 @@ export class GitPanel extends TypertRemoteService {
     const root = await this.repositoryOf(sessionId, signal)
     const staged = scope === 'staged'
     let result = await this.run(root, [
-      'diff', ...staged ? ['--cached'] : [], '--no-color', '--no-ext-diff', '-U3', '--', path,
+      'diff', ...staged ? ['--cached'] : [], '--no-color', '--no-ext-diff', '-U1000000', '--', path,
     ], signal, true)
     if (!staged && result.stdout.trim().length === 0) {
       // An untracked file has no index entry; compare it with the empty tree.
       result = await this.run(root, [
-        'diff', '--no-index', '--no-color', '--no-ext-diff', '-U3', '--', '/dev/null', path,
+        'diff', '--no-index', '--no-color', '--no-ext-diff', '-U1000000', '--', '/dev/null', path,
       ], signal, true)
     }
     return {
