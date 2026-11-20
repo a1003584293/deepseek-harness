@@ -11,6 +11,7 @@ import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceFileDocument, WorkspaceFileWrite } from '@deepseek-ai/dsh-api-workspace-files'
 import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SidebarRightTabDefinition, SidebarTextSelection } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { PaneId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { FileTypeIcon, IconBranchOutlineRegular, IconEditOutlineRegular, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -60,6 +61,8 @@ export interface EditorInjected {
   readonly publishFile: (contentId: string, address: string) => void
   /** Drop that registration when this body unmounts. */
   readonly clearFile: (contentId: string, address: string) => void
+  /** Open another file through the shared deduplicating editor opener. */
+  readonly openEditor: (path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => void
   /** Read the workspace checkout's current branch for the status line. */
   readonly readBranch: (signal: AbortSignal) => Promise<string | null>
   /** Live account facts for the status line and the code font and palette. */
@@ -105,26 +108,32 @@ export function EditorTitle({ useTabInfo, pathFor }: PropsRuntime<'sidebar.right
 
 /** The navigator and toggle share the tab's runtime and factory renderer. */
 type EditorNavigatorSeatProps = Pick<PropsRuntime<'sidebar.right.pane.tab'>, 'useTabInfo'> & PropsRenderFactories
+  & Pick<EditorInjected, 'openEditor'>
+
+/** The navigator toggle needs neither the opener nor the tab's store. */
+type EditorNavigatorToggleProps = Pick<PropsRuntime<'sidebar.right.pane.tab'>, 'useTabInfo'> & PropsRenderFactories
 
 /** The workspace navigator beside the editor's content row. */
-const EditorNavigator = memo(function EditorNavigator({ useTabInfo, renderFactorySlot }: EditorNavigatorSeatProps): ReactNode {
+const EditorNavigator = memo(function EditorNavigator({ useTabInfo, renderFactorySlot, openEditor }: EditorNavigatorSeatProps): ReactNode {
   const { tab, panel } = useTabInfo()
   const onOpen = useCallback((address: string): void => {
     if (isEditableFileAddress(address)) {
-      tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+      openEditor(address, { id: panel.id, floating: panel.isFloating })
       return
     }
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
-  }, [tab.actions, panel.id, panel.isFloating])
+  }, [openEditor, tab.actions, panel.id, panel.isFloating])
   const onEdit = useCallback((address: string): void => {
-    tab.actions.openTab('file-editor', { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
-  }, [tab.actions, panel.id, panel.isFloating])
+    openEditor(address, { id: panel.id, floating: panel.isFloating })
+  }, [openEditor, panel.id, panel.isFloating])
   return renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: false, onOpen, onEdit })
 })
 
 /** The navigator's show/hide control in the editor header. */
-const EditorNavigatorToggle = memo(function EditorNavigatorToggle({ useTabInfo, renderFactorySlot }: EditorNavigatorSeatProps): ReactNode {
+const EditorNavigatorToggle = memo(function EditorNavigatorToggle({
+  useTabInfo, renderFactorySlot,
+}: EditorNavigatorToggleProps): ReactNode {
   return renderFactorySlot('sidebar.files.navigator.toggle', { useTabInfo })
 })
 
@@ -176,7 +185,7 @@ function languageOf(path: string): string {
  */
 export function EditorBody({
   sessionId, useSessions, useTabInfo, readDocument, writeDocument, pathFor, rememberPath, viewStateFor, rememberViewState,
-  reportSelection, clearSelection, publishFile, clearFile, readBranch, useAccountName, useAccountBalance, useTheme,
+  reportSelection, clearSelection, publishFile, clearFile, openEditor, readBranch, useAccountName, useAccountBalance, useTheme,
   renderFactorySlot, t,
 }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
@@ -449,7 +458,7 @@ export function EditorBody({
             setDirty(event.target.value !== savedText.current)
           }} />
           : <div ref={hostRef} className={css.host} data-monaco-editor />}
-        <EditorNavigator useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} />
+        <EditorNavigator useTabInfo={useTabInfo} renderFactorySlot={renderFactorySlot} openEditor={openEditor} />
       </div>
       <footer className={css.footer}>
         {branch === undefined ? null : <span className={css.branch} title={branch} data-editor-branch>

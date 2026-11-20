@@ -16,9 +16,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { createSnapshotStore, type BoundActions } from '@deepseek-ai/dsh-client-store'
-import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { PaneId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { isAbsoluteWorkspacePath, isEditableFileAddress, parseFileAddress, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
+import { fileAddressFor, isAbsoluteWorkspacePath, isEditableFileAddress, parseFileAddress, resolveWorkspacePath, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { FILES_ID, FILES_KIND, filesDefinition } from './definition.tsx'
 import { canOpenOf, createList, createWatch, filesFace, type FilesInjected } from './face.ts'
@@ -81,7 +81,7 @@ interface DesktopOpenFiles {
  * Required browser services: the tab registry, the keyed seat, the Remote
  * carrier and its namespace, and copy.
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'remote.gitPanel', 'layout', 'theme']
+export const inject = ['slots', 'locale', 'sessions', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'remote.gitPanel', 'layout', 'theme']
 
 /**
  * Client plugin body: register the type, its shortcut, its dictionaries, the
@@ -109,8 +109,9 @@ export function apply(ctx: ClientContext): void {
   // Scroll and cursor state per Session path; a reopened editor returns to where
   // the reader left it, including across an application restart.
   const editorViewStates = createSnapshotStore<Record<string, MonacoViewState>>({}, { persist: { name: 'sidebarEditorViewStates' } })
-  // Sessions with a file editor tab open; the composer hides its facts row while
-  // the editor's own footer can show them.
+  // Sessions whose active right-sidebar tab is a file editor. The composer hides
+  // its facts row only then, because that editor's footer owns them; a preview
+  // tab leaves the composer row visible even when an editor is open behind it.
   const editorSessions = createSnapshotStore<ReadonlySet<SessionId>>(new Set())
   const themeSource = {
     getSnapshot: () => ctx.theme.getTheme(),
@@ -121,17 +122,21 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const sync = (): void => {
       const next = new Set<SessionId>()
-      for (const tab of ctx.sidebarRight.openTabs.getSnapshot()) {
-        if (tab.kind === EDITOR_KIND) next.add(tab.sessionId)
-      }
+      const sessionId = ctx.sidebarRight.mounted.getSnapshot()
+      const active = ctx.sidebarRight.active()
+      if (sessionId !== undefined && active?.kind === EDITOR_KIND) next.add(sessionId)
       const current = editorSessions.getSnapshot()
-      if (current.size === next.size && [...next].every(sessionId => current.has(sessionId))) return
+      if (current.size === next.size && [...next].every(id => current.has(id))) return
       editorSessions.set(next)
     }
-    const unsubscribe = ctx.sidebarRight.openTabs.subscribe(sync)
+    const stops = [
+      ctx.sidebarRight.openTabs.subscribe(sync),
+      ctx.sidebarRight.mounted.subscribe(sync),
+      ctx.sidebarRight.activeFile.subscribe(sync),
+    ]
     sync()
-    return unsubscribe
-  }, 'ui-sidebar-files: open editor sessions')
+    return () => { for (const stop of stops) stop() }
+  }, 'ui-sidebar-files: active editor sessions')
   // The account plugin owns the profile and balance presentation; the status
   // line renders its display text unchanged so cents truncate exactly as the
   // Account settings rows do. The account package cannot be a type dependency
@@ -146,6 +151,33 @@ export function apply(ctx: ClientContext): void {
     sync()
     accountCtx.effect(() => account.subscribe(sync), 'ui-sidebar-files: account status')
   })
+  // Every file open, from a tree row, the editor navigator, a preview action,
+  // the composer, or the Desktop shell, reaches this one path. It canonicalizes
+  // the Session address and focuses an already-open editor instead of adding a
+  // second tab for the same absolute file.
+  const openEditor = (
+    sessionId: SessionId,
+    pathOrAddress: string,
+    pane?: { readonly id: PaneId; readonly floating: boolean },
+  ): void => {
+    const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+    const path = parseFileAddress(pathOrAddress)?.path ?? pathOrAddress
+    const address = fileAddressFor(sessionId, cwd, path)
+    const wanted = resolveWorkspacePath(cwd, path).replace(/\\/g, '/')
+    for (const tab of ctx.sidebarRight.openTabs.getSnapshot()) {
+      if (tab.sessionId !== sessionId || tab.kind !== EDITOR_KIND) continue
+      const known = editorPaths.getSnapshot()[tab.contentId]
+      if (known === undefined) continue
+      const knownPath = parseFileAddress(known)?.path ?? known
+      if (resolveWorkspacePath(cwd, knownPath).replace(/\\/g, '/') !== wanted) continue
+      ctx.sidebarRight.focus(tab.tabId)
+      return
+    }
+    ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, {
+      params: { path: address },
+      ...pane === undefined || pane.floating ? {} : { paneId: pane.id },
+    })
+  }
   const workspaceSearch = createSearch(ctx.remote)
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {
     const source = ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: tabId }).navigation
@@ -160,7 +192,7 @@ export function apply(ctx: ClientContext): void {
         return () => { active = false; unsubscribe() }
       }, 'ui-sidebar-files: tab navigation'),
     }
-  }, workspaceSearch, preferences, ctx.layout.editorSide)
+  }, workspaceSearch, preferences, ctx.layout.editorSide, openEditor)
   // A Factory runs its inject per occurrence, so each store instance gets its
   // one face when it is minted. The shortcut, which acts outside any body, finds
   // the face placed beside the target tab; a tab's loading and loaded drawings
@@ -349,6 +381,7 @@ export function apply(ctx: ClientContext): void {
       } | undefined
       sidebar?.clearPageFile(sessionId, contentId, address)
     },
+    openEditor: (path, pane) => { openEditor(sessionId, path, pane) },
     readBranch: signal => readBranch(sessionId, signal),
     hooks: { accountName, accountBalance, theme: themeSource },
   })
@@ -368,7 +401,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({
     name: 'sidebar.right.tab.document.actions', id: EDITOR_ID, locale: NS,
     inject: (sessionId): EditFileActionInjected => ({
-      openEditor: (path) => { ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } }) },
+      openEditor: (path) => { openEditor(sessionId, path) },
     }),
   }, EditFileAction)), 'ui-sidebar-files: preview edit action')
   // The composer's facts row mirrors the editor footer, but only while no file
@@ -386,10 +419,11 @@ export function apply(ctx: ClientContext): void {
   // preview that claims the file's session address (absolute paths included).
   const openPath = (sessionId: SessionId, path: string): void => {
     if (isEditableFileAddress(path)) {
-      ctx.sidebarRight.openTabIn(sessionId, EDITOR_KIND, { params: { path } })
+      openEditor(sessionId, path)
       return
     }
-    ctx.sidebarRight.openResourceIn(sessionId, sessionFileAddress(sessionId, path))
+    const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+    ctx.sidebarRight.openResourceIn(sessionId, fileAddressFor(sessionId, cwd, path))
   }
   ctx.on('conversation/file-reference', ({ sessionId, path }) => { openPath(sessionId, path) })
   let pendingDesktopFiles: string[] = []

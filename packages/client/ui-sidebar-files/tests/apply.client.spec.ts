@@ -51,6 +51,7 @@ const PANE = 'pane-1' as PaneId
 async function boot() {
   const ctx = new Context()
   ctx.provide('contextMenus', { open: vi.fn() } as never)
+  ctx.provide('sessions', { list: createSnapshotStore({ ids: [], byId: {}, phase: 'ready' }) } as never)
   const tabs = new SidebarRightTabRegistry(ctx)
   const registered: Recorded[] = []
   const slots = {
@@ -88,7 +89,9 @@ async function boot() {
     tabDomain: { occurrence: vi.fn(() => ({ navigation: source })) },
     commandTarget: vi.fn(), openTabFromTarget: vi.fn(),
     isExpanded: vi.fn(() => true), toggleExpanded: vi.fn(),
-    openTabs, mounted, active: vi.fn(() => undefined), close: vi.fn(), openResource: vi.fn(),
+    openTabs, mounted, active: vi.fn(() => undefined),
+    activeFile: createSnapshotStore<{ sessionId: SessionId; address: string; path: string } | undefined>(undefined),
+    close: vi.fn(), focus: vi.fn(), openResource: vi.fn(),
     openTabIn: vi.fn(), openResourceIn: vi.fn(),
   }
   const commands: ShortcutCommand[] = []
@@ -171,8 +174,13 @@ describe('ui-sidebar-files apply', () => {
       expect(face.hooks.accountName.getSnapshot()).toBe('User')
       expect(face.hooks.accountBalance.getSnapshot()).toBe('¥2.33')
       expect(face.hooks.editorSessions.getSnapshot().has(SESSION)).toBe(false)
-      h.sidebar.openTabs.set([{ sessionId: SESSION, tabId: 'tab-1', kind: 'file-editor', contentId: 'content-1' }])
+      h.sidebar.mounted.set(SESSION)
+      h.sidebar.active.mockReturnValue({ kind: 'file-editor' } as never)
+      h.sidebar.activeFile.set({ sessionId: SESSION, address: 'dsh-resource://file/session/x/a.ts', path: 'a.ts' })
       expect(face.hooks.editorSessions.getSnapshot().has(SESSION)).toBe(true)
+      h.sidebar.active.mockReturnValue({ kind: 'document-preview' } as never)
+      h.sidebar.activeFile.set({ sessionId: SESSION, address: 'dsh-resource://file/session/x/a.md', path: 'a.md' })
+      expect(face.hooks.editorSessions.getSnapshot().has(SESSION)).toBe(false)
     } finally { await h.fiber.dispose() }
   })
 
@@ -180,9 +188,22 @@ describe('ui-sidebar-files apply', () => {
     const h = await boot()
     try {
       h.ctx.emit('conversation/file-reference', { sessionId: SESSION, path: '/work/app/notes.md' })
-      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: '/work/app/notes.md' } })
+      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: 'dsh-resource://file/session/files-session//work/app/notes.md' } })
       h.ctx.emit('conversation/file-reference', { sessionId: SESSION, path: '/work/app/report.pdf' })
       expect(h.sidebar.openResourceIn).toHaveBeenCalledWith(SESSION, 'dsh-resource://file/session/files-session//work/app/report.pdf')
+    } finally { await h.fiber.dispose() }
+  })
+
+  it('focuses the existing editor for the same absolute file instead of opening another tab', async () => {
+    const h = await boot()
+    try {
+      const page = h.registered.find(entry => entry.name === 'sidebar.right.pane.tab' && entry.key === EDITOR_ID)!
+      const editor = page.inject!(SESSION, {}) as EditorInjected
+      editor.rememberPath('content-1', 'dsh-resource://file/session/files-session//work/app/notes.md')
+      h.sidebar.openTabs.set([{ sessionId: SESSION, tabId: 'tab-1', kind: 'file-editor', contentId: 'content-1' }])
+      h.ctx.emit('conversation/file-reference', { sessionId: SESSION, path: '/work/app/notes.md' })
+      expect(h.sidebar.openTabIn).not.toHaveBeenCalled()
+      expect(h.sidebar.focus).toHaveBeenCalledWith('tab-1')
     } finally { await h.fiber.dispose() }
   })
 
@@ -198,7 +219,7 @@ describe('ui-sidebar-files apply', () => {
       listeners[0]!(['/work/app/notes.md', '/work/app/report.pdf'])
       expect(h.sidebar.openTabIn).not.toHaveBeenCalled()
       h.sidebar.mounted.set(SESSION)
-      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: '/work/app/notes.md' } })
+      expect(h.sidebar.openTabIn).toHaveBeenCalledWith(SESSION, 'file-editor', { params: { path: 'dsh-resource://file/session/files-session//work/app/notes.md' } })
       expect(h.sidebar.openResourceIn).toHaveBeenCalledWith(SESSION, 'dsh-resource://file/session/files-session//work/app/report.pdf')
     } finally {
       await h.fiber.dispose()

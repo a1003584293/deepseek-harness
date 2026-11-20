@@ -41,7 +41,7 @@ export type FilesBodyProps =
 export function FilesBody(props: FilesBodyProps): ReactNode {
   const {
     useTabInfo, sessionId, useSessions, useStore, actions, refresh, focus, placeBeside,
-    setAutoRefresh, renderSlot, renderFactorySlot, t, useContextMenu,
+    setAutoRefresh, openEditor, renderSlot, renderFactorySlot, t, useContextMenu,
   } = props
   const { tab, panel } = useTabInfo()
   const { getTriggerProps } = useContextMenu()
@@ -49,15 +49,17 @@ export function FilesBody(props: FilesBodyProps): ReactNode {
     // Text-like files open directly in the editor; media and documents keep
     // their preview viewer.
     if (isEditableFileAddress(address)) {
-      tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+      if (openEditor !== undefined) openEditor(address, { id: panel.id, floating: panel.isFloating })
+      else tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
       return
     }
     if (panel.isFloating) tab.actions.openResource(address)
     else tab.actions.openResource(address, { paneId: panel.id })
-  }, [tab.actions, panel.id, panel.isFloating])
+  }, [openEditor, tab.actions, panel.id, panel.isFloating])
   const onEdit = useCallback((address: string): void => {
-    tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
-  }, [tab.actions, panel.id, panel.isFloating])
+    if (openEditor !== undefined) openEditor(address, { id: panel.id, floating: panel.isFloating })
+    else tab.actions.openTab(EDITOR_KIND, { params: { path: address }, ...panel.isFloating ? {} : { paneId: panel.id } })
+  }, [openEditor, tab.actions, panel.id, panel.isFloating])
   useEffect(
     () => tab.actions.bindCommands({ refresh: () => { refresh(panel.id) } }),
     [tab.actions, panel.id, refresh],

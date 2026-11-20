@@ -116,6 +116,13 @@ export function createList(remote: WorkspaceFilesListRemote): ListWorkspaceDirec
 /** The tree's injected business face, as the navigator receives it. */
 export interface FilesInjected {
   /**
+   * Open one text-like file in the editor, focusing an existing tab for the
+   * same absolute path instead of adding a duplicate.
+   * @param path - file address or path.
+   * @param pane - the pane the open should land in, and whether it is floating.
+   */
+  readonly openEditor?: (path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => void
+  /**
    * Register a navigator mounted for one tab in one pane, until the returned
    * release. A pane's records — the store's tree, the scroll offset, the file
    * revealed last — last while a navigator is registered there or an open tab,
@@ -409,6 +416,7 @@ export function filesFace(
   search: SearchWorkspace,
   preferences: WorkspaceSearchPreferenceBook,
   editorSide: HostObservable<'left' | 'right'>,
+  openEditor?: (sessionId: SessionId, path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => void,
 ): (
   sessionId: SessionId,
   store: Pick<FilesStoreInstance, 'actions' | 'getSnapshot' | 'subscribe'>,
@@ -664,6 +672,11 @@ export function filesFace(
       for (const home of homes.values()) if (home.pane === pane) answerNavigation(home)
     }
     const face: FilesInjected = {
+      ...openEditor === undefined ? {} : {
+        openEditor: (path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => {
+          openEditor(sessionId, path, pane)
+        },
+      },
       attach(paneId, tabId, tabSignal) {
         if (tabSignal.aborted) {
           drop(paneId)
