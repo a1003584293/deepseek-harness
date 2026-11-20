@@ -244,3 +244,9 @@
 .titleIcon {
   flex: none;
 }
+
+/* The same changes list when it fills a file navigator rather than the page. */
+.navigator { flex: auto; min-height: 0; overflow: auto; padding: 4px 0; }
+.navigatorHeader { display: flex; align-items: center; gap: 4px; padding: 4px 8px 6px; border-bottom: .5px solid var(--dsw-alias-border-l3); }
+.navigatorHeader .branch { flex: auto; font-size: 11px; }
+.navigatorHeader .refresh { width: 22px; height: 22px; }

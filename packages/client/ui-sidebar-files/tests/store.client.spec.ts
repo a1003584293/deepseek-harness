@@ -44,7 +44,7 @@ describe('createFilesStore', () => {
     const getSnapshot = (): ReturnType<typeof store.getSnapshot> => store.getSnapshot()
     actions.start(PANE, ROOT)
     expect(getSnapshot().byPane[PANE]).toEqual({
-      open: undefined, width: DEFAULT_NAVIGATOR_WIDTH, query: '', searchBarOpen: false, search: undefined,
+      open: undefined, width: DEFAULT_NAVIGATOR_WIDTH, query: '', searchBarOpen: false, search: undefined, sourceControl: false,
       tree: { root: ROOT, levels: {}, expanded: [ROOT], autoRefresh: true },
     })
   })
@@ -163,12 +163,12 @@ describe('createFilesStore', () => {
     const { actions } = store
     actions.shown(PANE, true)
     actions.resized(PANE, 320)
-    expect(store.getSnapshot().byPane[PANE]).toEqual({ open: true, width: 320, tree: undefined, query: '', searchBarOpen: false, search: undefined })
+    expect(store.getSnapshot().byPane[PANE]).toEqual({ open: true, width: 320, tree: undefined, query: '', searchBarOpen: false, search: undefined, sourceControl: false })
     actions.start(PANE, ROOT)
     actions.loaded(PANE, ROOT, LEVEL)
     actions.start(PANE, '/work/other')
     expect(store.getSnapshot().byPane[PANE]).toEqual({
-      open: true, width: 320, query: '', searchBarOpen: false, search: undefined,
+      open: true, width: 320, query: '', searchBarOpen: false, search: undefined, sourceControl: false,
       tree: { root: '/work/other', levels: {}, expanded: ['/work/other'], autoRefresh: true },
     })
   })

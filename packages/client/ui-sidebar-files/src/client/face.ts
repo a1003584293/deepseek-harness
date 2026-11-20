@@ -16,6 +16,7 @@
 import type { ClientRemote, RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { PaneId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { GitDiffScope, GitStatusValue } from '@deepseek-ai/dsh-api-workspace-files'
 import type { SidebarRightTabDefinition, SidebarRightTabNavigation } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -113,6 +114,17 @@ export function createList(remote: WorkspaceFilesListRemote): ListWorkspaceDirec
   }
 }
 
+/** Source-control reads and mutations the navigator uses without mounting the page. */
+export interface SourceControlFace {
+  readonly readStatus: (signal: AbortSignal) => Promise<
+    { readonly ok: true; readonly value: GitStatusValue }
+    | { readonly ok: false; readonly error: { readonly message: string } }
+  >
+  readonly stage: (paths: readonly string[], signal: AbortSignal) => Promise<unknown>
+  readonly unstage: (paths: readonly string[], signal: AbortSignal) => Promise<unknown>
+  readonly openDiff: (path: string, scope: GitDiffScope) => void
+}
+
 /** The tree's injected business face, as the navigator receives it. */
 export interface FilesInjected {
   /**
@@ -122,6 +134,8 @@ export interface FilesInjected {
    * @param pane - the pane the open should land in, and whether it is floating.
    */
   readonly openEditor?: (path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => void
+  /** Source-control data for the pane's `sourceControl` navigator mode. */
+  readonly sourceControl?: SourceControlFace
   /**
    * Register a navigator mounted for one tab in one pane, until the returned
    * release. A pane's records — the store's tree, the scroll offset, the file
@@ -417,6 +431,7 @@ export function filesFace(
   preferences: WorkspaceSearchPreferenceBook,
   editorSide: HostObservable<'left' | 'right'>,
   openEditor?: (sessionId: SessionId, path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => void,
+  sourceControl?: (sessionId: SessionId) => SourceControlFace,
 ): (
   sessionId: SessionId,
   store: Pick<FilesStoreInstance, 'actions' | 'getSnapshot' | 'subscribe'>,
@@ -672,6 +687,7 @@ export function filesFace(
       for (const home of homes.values()) if (home.pane === pane) answerNavigation(home)
     }
     const face: FilesInjected = {
+      ...sourceControl === undefined ? {} : { sourceControl: sourceControl(sessionId) },
       ...openEditor === undefined ? {} : {
         openEditor: (path: string, pane: { readonly id: PaneId; readonly floating: boolean }) => {
           openEditor(sessionId, path, pane)

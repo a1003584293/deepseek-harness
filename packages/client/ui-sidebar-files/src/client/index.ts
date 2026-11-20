@@ -21,10 +21,10 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { fileAddressFor, isAbsoluteWorkspacePath, isEditableFileAddress, parseFileAddress, resolveWorkspacePath, sessionFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { FILES_ID, FILES_KIND, filesDefinition } from './definition.tsx'
-import { canOpenOf, createList, createWatch, filesFace, type FilesInjected } from './face.ts'
+import { canOpenOf, createList, createWatch, filesFace, type FilesInjected, type SourceControlFace } from './face.ts'
 import { createSearch } from './search-workspace.ts'
 import { FileTree } from './FileTree.tsx'
-import { FileNavigator } from './FileNavigator.tsx'
+import { FilesNavigator } from './FilesNavigator.tsx'
 import { FilesBody } from './FilesBody.tsx'
 import { FilesTitle } from './FilesTitle.tsx'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
@@ -33,7 +33,8 @@ import { QuickOpen, type QuickOpenInjected } from './QuickOpen.tsx'
 import { expandQuickOpenPath, quickOpenEntry, RECENT_FILES_KEY, rememberRecent, type RecentFiles } from './quick-open.ts'
 import { createSearchPreferenceBook, SEARCH_PREFERENCES_KEY } from './search-preferences.ts'
 import {
-  GIT_ID, GIT_KIND, SourceControlPage, SourceControlTitle, sourceControlDefinition, type GitInjected,
+  GIT_DIFF_ID, GIT_DIFF_KIND, GIT_ID, GIT_KIND, SourceControlDiffBody, SourceControlDiffTitle, SourceControlPage, SourceControlTitle,
+  gitDiffDefinition, sourceControlDefinition, type GitInjected,
 } from './SourceControlBody.tsx'
 import {
   EDITOR_ID, EDITOR_KIND, EditFileAction, EditorBody, EditorTitle, editorDefinition, type EditFileActionInjected, type EditorInjected,
@@ -178,6 +179,21 @@ export function apply(ctx: ClientContext): void {
       ...pane === undefined || pane.floating ? {} : { paneId: pane.id },
     })
   }
+  const gitPanel = (): NonNullable<typeof ctx.remote.gitPanel> => {
+    const panel = Reflect.get(ctx.remote, 'gitPanel') as (typeof ctx.remote.gitPanel) | undefined
+    if (panel === undefined) throw new Error('source control is unavailable: the gitPanel Remote is not mounted')
+    return panel
+  }
+  const sourceControlFace = (sessionId: SessionId): SourceControlFace => {
+    return {
+      readStatus: signal => gitPanel().status(sessionId, signal),
+      stage: (paths, signal) => gitPanel().stage(sessionId, [...paths], signal),
+      unstage: (paths, signal) => gitPanel().unstage(sessionId, [...paths], signal),
+      openDiff: (path, scope) => {
+        ctx.sidebarRight.openTabIn(sessionId, GIT_DIFF_KIND, { params: { path, scope } })
+      },
+    }
+  }
   const workspaceSearch = createSearch(ctx.remote)
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {
     const source = ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: tabId }).navigation
@@ -192,12 +208,13 @@ export function apply(ctx: ClientContext): void {
         return () => { active = false; unsubscribe() }
       }, 'ui-sidebar-files: tab navigation'),
     }
-  }, workspaceSearch, preferences, ctx.layout.editorSide, openEditor)
+  }, workspaceSearch, preferences, ctx.layout.editorSide, openEditor, sourceControlFace)
   // A Factory runs its inject per occurrence, so each store instance gets its
   // one face when it is minted. The shortcut, which acts outside any body, finds
   // the face placed beside the target tab; a tab's loading and loaded drawings
   // each place it, so placements are counted, and the latest face placed wins.
   const faces = new WeakMap<object, FilesInjected>()
+  const instances = new Map<SessionId, ReturnType<typeof handle.create>>()
   const beside = new Map<SessionId, Map<TabId, { readonly face: FilesInjected; placed: number }>>()
   const place = (sessionId: SessionId) => (tabId: TabId, bound: FilesInjected): () => void => {
     const tabs = beside.get(sessionId) ?? new Map<TabId, { readonly face: FilesInjected; placed: number }>()
@@ -223,6 +240,7 @@ export function apply(ctx: ClientContext): void {
       if (scopeKey === undefined) return instance
       const sessionId = scopeKey as SessionId
       faces.set(instance.actions, face(sessionId, instance, place(sessionId)))
+      instances.set(sessionId, instance)
       return instance
     },
   }
@@ -250,6 +268,14 @@ export function apply(ctx: ClientContext): void {
         if (target === undefined) return { status: 'blocked', reason: t('shortcut.noSession') }
         /* jscpd:ignore-end */
         return { status: 'handled', run: () => {
+          // The files shortcut always returns the pane's navigator to the tree,
+          // including when source-control changes currently fill it.
+          const instance = instances.get(target.sessionId)
+          if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {
+            instance.actions.sourceControlShown(target.paneId, false)
+            instance.actions.shown(target.paneId, true)
+            return
+          }
           // A second press on the files page closes it, so the shortcut toggles
           // instead of only ever revealing the tree.
           const active = ctx.sidebarRight.active()
@@ -297,9 +323,21 @@ export function apply(ctx: ClientContext): void {
         'web:linux': { code: 'KeyG', modifiers: ['primary', 'shift'] },
       },
       regions: ['page', 'editable', 'terminal'], modals: [],
-      resolve: ({ target }) => ctx.sidebarRight.commandTarget(target) === undefined
-        ? { status: 'blocked', reason: t('shortcut.noSession') }
-        : { status: 'handled', run: () => { ctx.sidebarRight.openTab(GIT_KIND) } },
+      resolve: ({ target: element }) => {
+        const target = ctx.sidebarRight.commandTarget(element)
+        if (target === undefined) return { status: 'blocked', reason: t('shortcut.noSession') }
+        return { status: 'handled', run: () => {
+          const instance = instances.get(target.sessionId)
+          if (instance === undefined) {
+            // No file navigator is mounted yet: open the source-control page as
+            // the fallback that still exposes the changes list.
+            ctx.sidebarRight.openTab(GIT_KIND)
+            return
+          }
+          instance.actions.shown(target.paneId, true)
+          instance.actions.sourceControlShown(target.paneId, true)
+        } }
+      },
     }), 'ui-sidebar-files: source control shortcut')
   })
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-sidebar-files: dictionaries')
@@ -309,7 +347,7 @@ export function apply(ctx: ClientContext): void {
   }, FileTree), 'ui-sidebar-files: tree factory')
   ctx.effect(() => ctx.slots.registerFactory({
     name: 'sidebar.files.navigator', scope: 'session', locale: NS, store, inject: injectFace,
-  }, FileNavigator), 'ui-sidebar-files: navigator factory')
+  }, FilesNavigator), 'ui-sidebar-files: navigator factory')
   ctx.effect(() => ctx.slots.registerFactory({
     name: 'sidebar.files.navigator.toggle', scope: 'session', locale: NS, store, inject: injectFace,
   }, NavigatorToggle), 'ui-sidebar-files: navigator toggle factory')
@@ -327,20 +365,12 @@ export function apply(ctx: ClientContext): void {
   // Source control is a page in the same dock: the tab body renders the status
   // groups and the selected patch; Git execution stays behind the Remote.
   const gitInjected = (sessionId: SessionId): GitInjected => {
-    // Resolve the namespace inside every call: an absent Host namespace must
-    // surface as a page error, not crash the slot inject face and blank the
-    // whole pane.
-    const git = (): NonNullable<typeof ctx.remote.gitPanel> => {
-      const panel = Reflect.get(ctx.remote, 'gitPanel') as (typeof ctx.remote.gitPanel) | undefined
-      if (panel === undefined) throw new Error('source control is unavailable: the gitPanel Remote is not mounted')
-      return panel
-    }
     return {
       hooks: { theme: themeSource },
-      readStatus: signal => git().status(sessionId, signal),
-      readDiff: (path, scope, signal) => git().diff(sessionId, path, scope, signal),
-      stage: (paths, signal) => git().stage(sessionId, [...paths], signal),
-      unstage: (paths, signal) => git().unstage(sessionId, [...paths], signal),
+      readStatus: signal => gitPanel().status(sessionId, signal),
+      readDiff: (path, scope, signal) => gitPanel().diff(sessionId, path, scope, signal),
+      stage: (paths, signal) => gitPanel().stage(sessionId, [...paths], signal),
+      unstage: (paths, signal) => gitPanel().unstage(sessionId, [...paths], signal),
     }
   }
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
@@ -351,6 +381,17 @@ export function apply(ctx: ClientContext): void {
     { name: 'sidebar.right.pane.tab.title', key: GIT_ID },
     SourceControlTitle,
   )), 'ui-sidebar-files: source control tab title')
+  // A selected patch is its own tab, so opening a diff never replaces the file
+  // tab it was reviewed from.
+  ctx.effect(() => ctx.sidebarRightTabs.register(gitDiffDefinition(t)), 'ui-sidebar-files: source control diff type')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab', key: GIT_DIFF_ID, locale: NS, inject: gitInjected },
+    SourceControlDiffBody,
+  )), 'ui-sidebar-files: source control diff body')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: GIT_DIFF_ID },
+    SourceControlDiffTitle,
+  )), 'ui-sidebar-files: source control diff title')
   const readBranch = async (sessionId: SessionId, signal: AbortSignal): Promise<string | null> => {
     const panel = Reflect.get(ctx.remote, 'gitPanel') as typeof ctx.remote.gitPanel | undefined
     if (panel === undefined) return null

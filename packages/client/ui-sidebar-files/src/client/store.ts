@@ -159,6 +159,8 @@ export interface FilesPaneState {
   searchBarOpen: boolean
   /** The pane's search, which the navigator draws instead of the tree; `undefined` while the query is blank. */
   search: FilesSearchState | undefined
+  /** Whether the pane's navigator shows source-control changes instead of the workspace tree. */
+  sourceControl: boolean
 }
 
 /** Every pane's navigator, keyed by pane id. */
@@ -266,7 +268,7 @@ function underRoot(path: string, root: string): string | undefined {
  * @returns the pane's record.
  */
 function pane(state: FilesState, paneId: PaneId): FilesPaneState {
-  state.byPane[paneId] ??= { open: undefined, width: DEFAULT_NAVIGATOR_WIDTH, tree: undefined, query: '', searchBarOpen: false, search: undefined }
+  state.byPane[paneId] ??= { open: undefined, width: DEFAULT_NAVIGATOR_WIDTH, tree: undefined, query: '', searchBarOpen: false, search: undefined, sourceControl: false }
   return state.byPane[paneId]
 }
 
@@ -299,6 +301,7 @@ type FilesActions = {
   searching: (draft: FilesState, paneId: PaneId) => void
   searched: (draft: FilesState, paneId: PaneId, result: FilesSearchResult) => void
   searchToggled: (draft: FilesState, paneId: PaneId, path: string) => void
+  sourceControlShown: (draft: FilesState, paneId: PaneId, shown: boolean) => void
 }
 
 /**
@@ -399,6 +402,13 @@ export function createFilesStore(): EngineStoreHandle<FilesState, FilesActions> 
        * @param open - whether the navigator is shown.
        */
       shown: (d, paneId: PaneId, open: boolean) => { pane(d, paneId).open = open },
+      /**
+       * Switch one pane's navigator between the workspace tree and source control.
+       * @param d - draft state.
+       * @param paneId - the pane being drawn.
+       * @param shown - whether the changes view is shown.
+       */
+      sourceControlShown: (d, paneId: PaneId, shown: boolean) => { pane(d, paneId).sourceControl = shown },
       /**
        * Show or hide the files page's search bar without changing its search.
        * @param d - draft state.

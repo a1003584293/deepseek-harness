@@ -23,11 +23,11 @@ import { apply as hostApply } from '../src/index.ts'
 import { FileTree } from '../src/client/FileTree.tsx'
 import { QuickOpen } from '../src/client/QuickOpen.tsx'
 import type { QuickOpenInjected } from '../src/client/QuickOpen.tsx'
-import { FileNavigator } from '../src/client/FileNavigator.tsx'
+import { FilesNavigator } from '../src/client/FilesNavigator.tsx'
 import { FilesBody } from '../src/client/FilesBody.tsx'
 import { FilesTitle } from '../src/client/FilesTitle.tsx'
 import { NavigatorToggle } from '../src/client/NavigatorToggle.tsx'
-import { GIT_ID, SourceControlPage, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
+import { GIT_DIFF_ID, GIT_ID, SourceControlDiffBody, SourceControlDiffTitle, SourceControlPage, SourceControlTitle } from '../src/client/SourceControlBody.tsx'
 import { EDITOR_ID, EditFileAction, EditorBody, EditorTitle } from '../src/client/EditorBody.tsx'
 import { SessionFacts } from '../src/client/SessionFacts.tsx'
 import type { SessionFactsInjected } from '../src/client/SessionFacts.tsx'
@@ -408,6 +408,8 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.right.pane.tab.title', FILES_ID, undefined],
       ['sidebar.right.pane.tab', GIT_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', GIT_ID, undefined],
+      ['sidebar.right.pane.tab', GIT_DIFF_ID, 'sidebarFiles'],
+      ['sidebar.right.pane.tab.title', GIT_DIFF_ID, undefined],
       ['sidebar.right.pane.tab', EDITOR_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', EDITOR_ID, undefined],
       ['sidebar.right.tab.document.actions', undefined, 'sidebarFiles'],
@@ -416,13 +418,18 @@ describe('ui-sidebar-files apply', () => {
     ])
     expect(slots.registerFactory.mock.calls.map(([options]) => [options.name, options.scope]))
       .toEqual([['sidebar.files.tree', 'root'], ['sidebar.files.navigator', 'session'], ['sidebar.files.navigator.toggle', 'session']])
-    const [tree, factory, toggle, body, title, gitBody, gitTitle, editorBody, editorTitle, editAction, facts, palette] = registered
+    const [
+      tree, factory, toggle, body, title, gitBody, gitTitle, gitDiffBody, gitDiffTitle,
+      editorBody, editorTitle, editAction, facts, palette,
+    ] = registered
     expect([
       factory?.component, toggle?.component, body?.component, title?.component,
-      gitBody?.component, gitTitle?.component, editorBody?.component, editorTitle?.component, editAction?.component,
+      gitBody?.component, gitTitle?.component, gitDiffBody?.component, gitDiffTitle?.component,
+      editorBody?.component, editorTitle?.component, editAction?.component,
       facts?.component, palette?.component,
     ]).toEqual([
-      FileNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlPage, SourceControlTitle,
+      FilesNavigator, NavigatorToggle, FilesBody, FilesTitle, SourceControlPage, SourceControlTitle,
+      SourceControlDiffBody, SourceControlDiffTitle,
       EditorBody, EditorTitle, EditFileAction, SessionFacts, QuickOpen,
     ])
     expect(tree?.component).toBe(FileTree)

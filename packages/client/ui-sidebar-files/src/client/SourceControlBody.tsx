@@ -330,6 +330,61 @@ export function SourceControlBody({
   )
 }
 
+
+/** The tab kind and id for one selected patch. */
+export const GIT_DIFF_KIND = 'source-control-diff'
+export const GIT_DIFF_ID = '@deepseek-ai/dsh-client-ui-sidebar-files/source-control-diff'
+
+declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
+  interface SidebarRightTabParamsMap {
+    /** One changed path and the index scope its patch was read from. */
+    'source-control-diff': { readonly path: string; readonly scope: GitDiffScope }
+  }
+}
+
+/** Definition of the source-control diff tab. */
+export function gitDiffDefinition(t: TranslateNS<'sidebarFiles'>): SidebarRightTabDefinition {
+  return { id: GIT_DIFF_ID, kind: GIT_DIFF_KIND, priority: 'builtin', title: () => t('git.title') }
+}
+
+/** The diff tab title: the changed file's leaf name. */
+export function SourceControlDiffTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab'>): ReactNode {
+  const { tab } = useTabInfo()
+  const path = tab.navigation.params?.path ?? ''
+  const name = path.split(/[/\\]/).pop() ?? path
+  return <><IconBranchOutlineRegular size={16} className={css.titleIcon} /><span>{name}</span></>
+}
+
+/** One selected patch, opened beside the file it reviews rather than replacing that file's tab. */
+export function SourceControlDiffBody({ useTabInfo, readDiff, useTheme, t }: SourceControlBodyProps): ReactNode {
+  const { tab } = useTabInfo()
+  const params = tab.navigation.params
+  const path = params?.path ?? ''
+  const scope = params !== undefined && 'scope' in params ? params.scope : 'working'
+  const appearance = useTheme(value => value)
+  const [diff, setDiff] = useState<GitDiffValue>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    if (path === '') return
+    const controller = new AbortController()
+    setDiff(undefined); setError(undefined)
+    void readDiff(path, scope, controller.signal).then((result) => {
+      if (controller.signal.aborted) return
+      if (result.ok) setDiff(result.value); else setError(result.error.message)
+    }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)) })
+    return () => { controller.abort() }
+  }, [path, scope, readDiff])
+  if (error !== undefined) return <div className={css.page} data-source-control-diff><p className={css.error} role="alert">{error}</p></div>
+  if (diff === undefined) return <div className={css.page} data-source-control-diff><p className={css.note}>{t('git.loading')}</p></div>
+  return <div className={css.page} data-source-control-diff>
+    <div className={css.diffPane}>
+      {hasMonaco() && !diff.binary && diff.patch.trim().length > 0
+        ? <MonacoDiff diff={diff} appearance={appearance} />
+        : <DiffView diff={diff} t={t} />}
+    </div>
+  </div>
+}
+
 /** Keep one crashing body from abdicating the whole keyed tab cell and blanking the pane. */
 class SourceControlBoundary extends Component<{ readonly children: ReactNode }, { readonly error?: Error }> {
   override state: { readonly error?: Error } = {}
