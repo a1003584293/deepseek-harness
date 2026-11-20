@@ -63,7 +63,12 @@ export function parseUnifiedPatch(patch: string): { original: string; modified: 
  * @param props.appearance - the code font and palette from the theme settings.
  * @returns the editor host, or nothing for a binary patch.
  */
-export function MonacoDiff({ diff, appearance }: { readonly diff: GitDiffValue; readonly appearance: CodeAppearance }): ReactNode {
+export function MonacoDiff({ diff, appearance, inline = false }: {
+  readonly diff: GitDiffValue
+  readonly appearance: CodeAppearance
+  /** Use one changed column when the diff shares a narrow dock with its tree. */
+  readonly inline?: boolean
+}): ReactNode {
   const hostRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const api = monaco()
@@ -75,7 +80,7 @@ export function MonacoDiff({ diff, appearance }: { readonly diff: GitDiffValue; 
     const editor = api.editor.createDiffEditor(host, {
       readOnly: true,
       originalEditable: false,
-      renderSideBySide: true,
+      renderSideBySide: !inline,
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
@@ -90,6 +95,6 @@ export function MonacoDiff({ diff, appearance }: { readonly diff: GitDiffValue; 
       originalModel.dispose()
       modifiedModel.dispose()
     }
-  }, [diff, appearance.fontSizes.code, appearance.fontFamilies.code, appearance.active.colorScheme])
+  }, [diff, inline, appearance.fontSizes.code, appearance.fontFamilies.code, appearance.active.colorScheme])
   return <div ref={hostRef} className={css.host} data-monaco-diff />
 }

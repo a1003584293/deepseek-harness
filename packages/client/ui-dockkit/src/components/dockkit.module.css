@@ -357,10 +357,10 @@
 .tab {
   position: relative;
   display: flex;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   align-items: center;
-  min-width: 80px;
-  max-width: 170px;
+  min-width: 0;
+  max-width: none;
   height: 28px;
   padding: 0 10px;
   color: var(--dsw-alias-label-secondary);

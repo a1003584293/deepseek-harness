@@ -394,7 +394,7 @@ export function SourceControlDiffBody({
   const content = error !== undefined ? <p className={css.error} role="alert">{error}</p>
     : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
       : hasMonaco() && !diff.binary && diff.patch.trim().length > 0
-        ? <MonacoDiff diff={diff} appearance={appearance} />
+        ? <MonacoDiff diff={diff} appearance={appearance} inline />
         : <DiffView diff={diff} t={t} />
   return <div className={css.page} data-source-control-diff>
     <div className={css.diffLayout}>
