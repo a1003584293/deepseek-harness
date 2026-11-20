@@ -123,6 +123,8 @@ export interface SourceControlFace {
   readonly stage: (paths: readonly string[], signal: AbortSignal) => Promise<unknown>
   readonly unstage: (paths: readonly string[], signal: AbortSignal) => Promise<unknown>
   readonly openDiff: (path: string, scope: GitDiffScope) => void
+  /** Last diff the reader opened, for a page tab restored without navigation params. */
+  readonly lastDiff: () => { readonly path: string; readonly scope: GitDiffScope } | undefined
 }
 
 /** The tree's injected business face, as the navigator receives it. */

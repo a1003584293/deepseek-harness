@@ -371,8 +371,9 @@ export function SourceControlDiffBody({
 }: SourceControlDiffBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const params = tab.navigation.params
-  const path = params?.path ?? ''
-  const scope = params !== undefined && 'scope' in params ? params.scope : 'working'
+  const remembered = params?.path === undefined ? sourceControl?.lastDiff() : undefined
+  const path = params?.path ?? remembered?.path ?? ''
+  const scope = (params !== undefined && 'scope' in params ? params.scope : undefined) ?? remembered?.scope ?? 'working'
   const appearance = useTheme(value => value)
   const [diff, setDiff] = useState<GitDiffValue>()
   const [error, setError] = useState<string>()
@@ -392,10 +393,11 @@ export function SourceControlDiffBody({
     />
   </div>
   const content = error !== undefined ? <p className={css.error} role="alert">{error}</p>
-    : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
-      : hasMonaco() && !diff.binary && diff.patch.trim().length > 0
-        ? <MonacoDiff diff={diff} appearance={appearance} />
-        : <DiffView diff={diff} t={t} />
+    : path === '' ? <p className={css.note}>{t('git.select')}</p>
+      : diff === undefined ? <p className={css.note}>{t('git.loading')}</p>
+        : hasMonaco() && !diff.binary && diff.patch.trim().length > 0
+          ? <MonacoDiff diff={diff} appearance={appearance} />
+          : <DiffView diff={diff} t={t} />
   return <div className={css.page} data-source-control-diff>
     <div className={css.diffLayout}>
       {navigator}

@@ -184,14 +184,32 @@ export function apply(ctx: ClientContext): void {
     if (panel === undefined) throw new Error('source control is unavailable: the gitPanel Remote is not mounted')
     return panel
   }
+  const SOURCE_CONTROL_DIFF_KEY = 'sidebarSourceControlDiff'
+  const readDiffTarget = (): { readonly path: string; readonly scope: 'working' | 'staged' } | undefined => {
+    if (typeof localStorage === 'undefined') return undefined
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem(SOURCE_CONTROL_DIFF_KEY) ?? 'null')
+      if (parsed === null || typeof parsed !== 'object') return undefined
+      const path = Reflect.get(parsed, 'path')
+      const scope = Reflect.get(parsed, 'scope')
+      return typeof path === 'string' && (scope === 'working' || scope === 'staged') ? { path, scope } : undefined
+    } catch (error: unknown) {
+      console.warn('sidebar source-control diff target could not be read:', error)
+      return undefined
+    }
+  }
   const sourceControlFace = (sessionId: SessionId): SourceControlFace => {
     return {
       readStatus: signal => gitPanel().status(sessionId, signal),
       stage: (paths, signal) => gitPanel().stage(sessionId, [...paths], signal),
       unstage: (paths, signal) => gitPanel().unstage(sessionId, [...paths], signal),
       openDiff: (path, scope) => {
+        try { localStorage.setItem(SOURCE_CONTROL_DIFF_KEY, JSON.stringify({ path, scope })) } catch (error: unknown) {
+          console.warn('sidebar source-control diff target could not be saved:', error)
+        }
         ctx.sidebarRight.openTabIn(sessionId, GIT_DIFF_KIND, { params: { path, scope } })
       },
+      lastDiff: readDiffTarget,
     }
   }
   const workspaceSearch = createSearch(ctx.remote)
@@ -273,11 +291,9 @@ export function apply(ctx: ClientContext): void {
           const instance = instances.get(target.sessionId)
           const active = ctx.sidebarRight.active()
           if (active?.kind === GIT_DIFF_KIND) {
-            // A diff is its own tab; returning to files closes it and reveals the
-            // file tab and navigator underneath rather than opening another page.
+            // The diff is the reader's current content. Hide the changes navigator
+            // and keep the diff; closing the tab here loses the comparison.
             instance?.actions.sourceControlShown(target.paneId, false)
-            instance?.actions.shown(target.paneId, true)
-            ctx.sidebarRight.close(active.id)
             return
           }
           if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {
@@ -339,8 +355,9 @@ export function apply(ctx: ClientContext): void {
             ctx.sidebarRight.openTab(GIT_KIND)
             return
           }
-          instance.actions.shown(target.paneId, true)
-          instance.actions.sourceControlShown(target.paneId, true)
+          const shown = instance.getSnapshot().byPane[target.paneId]?.sourceControl === true
+          instance.actions.sourceControlShown(target.paneId, !shown)
+          if (!shown) instance.actions.shown(target.paneId, true)
         } }
       },
     }), 'ui-sidebar-files: source control shortcut')
