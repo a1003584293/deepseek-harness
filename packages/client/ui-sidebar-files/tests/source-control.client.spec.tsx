@@ -102,6 +102,8 @@ describe('SourceControlBody', () => {
     expect(createDiffEditor.mock.calls[0]?.[1]).toMatchObject({
       fontSize: 14,
       fontFamily: '"Iosevka"',
+      renderSideBySide: true,
+      useInlineViewWhenSpaceIsLimited: false,
       scrollbar: { verticalScrollbarSize: 16, horizontalScrollbarSize: 16 },
       theme: 'vs-dark',
     })

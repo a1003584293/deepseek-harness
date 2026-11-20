@@ -291,9 +291,12 @@ export function apply(ctx: ClientContext): void {
           const instance = instances.get(target.sessionId)
           const active = ctx.sidebarRight.active()
           if (active?.kind === GIT_DIFF_KIND) {
-            // The diff is the reader's current content. Hide the changes navigator
-            // and keep the diff; closing the tab here loses the comparison.
+            // Keep the diff tab and reveal the existing file tab's tree. Closing
+            // the diff would lose the comparison the reader is inspecting.
             instance?.actions.sourceControlShown(target.paneId, false)
+            const fileTab = ctx.sidebarRight.tabsIn(target.sessionId).find(tab =>
+              tab.id !== active.id && (tab.kind === FILES_KIND || tab.kind === EDITOR_KIND))
+            if (fileTab !== undefined) ctx.sidebarRight.focus(fileTab.id)
             return
           }
           if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {

@@ -369,7 +369,8 @@ export function SourceControlDiffTitle({ useTabInfo }: PropsRuntime<'sidebar.rig
 export function SourceControlDiffBody({
   useTabInfo, useStore, readDiff, useTheme, sourceControl, sessionId, t,
 }: SourceControlDiffBodyProps): ReactNode {
-  const { tab } = useTabInfo()
+  const { tab, panel } = useTabInfo()
+  const navigatorShown = useStore(store => store.byPane[panel.id]?.sourceControl === true)
   const params = tab.navigation.params
   const remembered = params?.path === undefined ? sourceControl?.lastDiff() : undefined
   const path = params?.path ?? remembered?.path ?? ''
@@ -387,7 +388,7 @@ export function SourceControlDiffBody({
     }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)) })
     return () => { controller.abort() }
   }, [path, scope, readDiff])
-  const navigator = sourceControl === undefined ? null : <div className={css.diffNavigator}>
+  const navigator = sourceControl === undefined || !navigatorShown ? null : <div className={css.diffNavigator}>
     <SourceControlNavigator
       useTabInfo={useTabInfo} useStore={useStore} sessionId={sessionId} t={t} sourceControl={sourceControl}
     />
