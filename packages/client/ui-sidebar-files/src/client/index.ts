@@ -318,9 +318,6 @@ export function apply(ctx: ClientContext): void {
         'desktop:macos': { code: 'KeyG', modifiers: ['primary', 'shift'] },
         'desktop:windows': { code: 'KeyG', modifiers: ['primary', 'shift'] },
         'desktop:linux': { code: 'KeyG', modifiers: ['primary', 'shift'] },
-        'web:macos': { code: 'KeyG', modifiers: ['primary', 'shift'] },
-        'web:windows': { code: 'KeyG', modifiers: ['primary', 'shift'] },
-        'web:linux': { code: 'KeyG', modifiers: ['primary', 'shift'] },
       },
       regions: ['page', 'editable', 'terminal'], modals: [],
       resolve: ({ target: element }) => {
