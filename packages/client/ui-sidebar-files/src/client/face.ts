@@ -125,6 +125,8 @@ export interface SourceControlFace {
   readonly openDiff: (path: string, scope: GitDiffScope) => void
   /** Last diff the reader opened, for a page tab restored without navigation params. */
   readonly lastDiff: () => { readonly path: string; readonly scope: GitDiffScope } | undefined
+  /** Open a tree row from the diff tab's own file navigator. */
+  readonly openFile: (address: string, pane: { readonly id: PaneId; readonly floating: boolean }, edit: boolean) => void
 }
 
 /** The tree's injected business face, as the navigator receives it. */

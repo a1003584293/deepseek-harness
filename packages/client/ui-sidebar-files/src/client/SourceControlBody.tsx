@@ -8,7 +8,7 @@
  */
 import { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconBranchOutlineRegular, IconRefreshOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -59,6 +59,7 @@ export type SourceControlBodyProps =
 export type SourceControlDiffBodyProps =
   & PropsRuntime<'sidebar.right.pane.tab'>
   & PropsStore<ReturnType<typeof createFilesStore>>
+  & PropsRenderFactories
   & PropsLocale<'sidebarFiles'>
   & InjectFace<GitInjected & { readonly sourceControl?: SourceControlFace }>
 
@@ -357,17 +358,20 @@ export function gitDiffDefinition(t: TranslateNS<'sidebarFiles'>): SidebarRightT
   return { id: GIT_DIFF_ID, kind: GIT_DIFF_KIND, priority: 'builtin', title: () => t('git.title') }
 }
 
-/** The diff tab title: the changed file's leaf name. */
-export function SourceControlDiffTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab'>): ReactNode {
+/** The diff tab title: the changed file's leaf name, restored from the last target. */
+export function SourceControlDiffTitle({
+  useTabInfo, sourceControl, t,
+}: PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarFiles'>
+  & InjectFace<{ readonly sourceControl?: SourceControlFace }>): ReactNode {
   const { tab } = useTabInfo()
-  const path = tab.navigation.params?.path ?? ''
-  const name = path.split(/[/\\]/).pop() ?? path
+  const path = tab.navigation.params?.path ?? sourceControl?.lastDiff()?.path ?? ''
+  const name = path === '' ? t('git.title') : path.split(/[/\\]/).pop() ?? path
   return <><IconBranchOutlineRegular size={16} className={css.titleIcon} /><span>{name}</span></>
 }
 
 /** One selected patch, opened beside the file it reviews rather than replacing that file's tab. */
 export function SourceControlDiffBody({
-  useTabInfo, useStore, readDiff, useTheme, sourceControl, sessionId, t,
+  useTabInfo, useStore, readDiff, useTheme, sourceControl, sessionId, t, renderFactorySlot,
 }: SourceControlDiffBodyProps): ReactNode {
   const { tab, panel } = useTabInfo()
   const navigatorShown = useStore(store => store.byPane[panel.id]?.sourceControl === true)
@@ -388,10 +392,18 @@ export function SourceControlDiffBody({
     }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)) })
     return () => { controller.abort() }
   }, [path, scope, readDiff])
-  const navigator = sourceControl === undefined || !navigatorShown ? null : <div className={css.diffNavigator}>
-    <SourceControlNavigator
-      useTabInfo={useTabInfo} useStore={useStore} sessionId={sessionId} t={t} sourceControl={sourceControl}
-    />
+  const onOpen = useCallback((address: string): void => {
+    sourceControl?.openFile(address, { id: panel.id, floating: panel.isFloating }, false)
+  }, [sourceControl, panel.id, panel.isFloating])
+  const onEdit = useCallback((address: string): void => {
+    sourceControl?.openFile(address, { id: panel.id, floating: panel.isFloating }, true)
+  }, [sourceControl, panel.id, panel.isFloating])
+  const navigator = sourceControl === undefined ? null : <div className={css.diffNavigator}>
+    {navigatorShown
+      ? <SourceControlNavigator
+        useTabInfo={useTabInfo} useStore={useStore} sessionId={sessionId} t={t} sourceControl={sourceControl}
+      />
+      : renderFactorySlot('sidebar.files.navigator', { useTabInfo, page: true, onOpen, onEdit })}
   </div>
   const content = error !== undefined ? <p className={css.error} role="alert">{error}</p>
     : path === '' ? <p className={css.note}>{t('git.select')}</p>

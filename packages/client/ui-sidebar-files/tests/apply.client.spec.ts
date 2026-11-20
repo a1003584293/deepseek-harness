@@ -409,7 +409,7 @@ describe('ui-sidebar-files apply', () => {
       ['sidebar.right.pane.tab', GIT_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', GIT_ID, undefined],
       ['sidebar.right.pane.tab', GIT_DIFF_ID, 'sidebarFiles'],
-      ['sidebar.right.pane.tab.title', GIT_DIFF_ID, undefined],
+      ['sidebar.right.pane.tab.title', GIT_DIFF_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab', EDITOR_ID, 'sidebarFiles'],
       ['sidebar.right.pane.tab.title', EDITOR_ID, undefined],
       ['sidebar.right.tab.document.actions', undefined, 'sidebarFiles'],

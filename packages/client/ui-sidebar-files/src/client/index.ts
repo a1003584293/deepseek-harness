@@ -210,6 +210,13 @@ export function apply(ctx: ClientContext): void {
         ctx.sidebarRight.openTabIn(sessionId, GIT_DIFF_KIND, { params: { path, scope } })
       },
       lastDiff: readDiffTarget,
+      openFile: (address, pane, edit) => {
+        if (edit || isEditableFileAddress(address)) {
+          openEditor(sessionId, address, { id: pane.id, floating: pane.floating })
+          return
+        }
+        ctx.sidebarRight.openResourceIn(sessionId, address)
+      },
     }
   }
   const workspaceSearch = createSearch(ctx.remote)
@@ -291,10 +298,9 @@ export function apply(ctx: ClientContext): void {
           const instance = instances.get(target.sessionId)
           const active = ctx.sidebarRight.active()
           if (active?.kind === GIT_DIFF_KIND) {
-            // Keep the diff tab and put the file tree in its own page. Jumping to
-            // an arbitrary open file tab hid the tree the shortcut promises.
+            // The diff body draws the file tree in its own left column; keep the
+            // diff tab and switch that column instead of opening another tab.
             instance?.actions.sourceControlShown(target.paneId, false)
-            ctx.sidebarRight.openTabFromTarget(FILES_KIND, target)
             return
           }
           if (instance?.getSnapshot().byPane[target.paneId]?.sourceControl === true) {
@@ -413,10 +419,10 @@ export function apply(ctx: ClientContext): void {
       ...gitInjected(sessionId), sourceControl: sourceControlFace(sessionId),
     }),
   }, SourceControlDiffBody)), 'ui-sidebar-files: source control diff body')
-  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
-    { name: 'sidebar.right.pane.tab.title', key: GIT_DIFF_ID },
-    SourceControlDiffTitle,
-  )), 'ui-sidebar-files: source control diff title')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
+    name: 'sidebar.right.pane.tab.title', key: GIT_DIFF_ID, locale: NS,
+    inject: (sessionId: SessionId) => ({ sourceControl: sourceControlFace(sessionId) }),
+  }, SourceControlDiffTitle)), 'ui-sidebar-files: source control diff title')
   const readBranch = async (sessionId: SessionId, signal: AbortSignal): Promise<string | null> => {
     const panel = Reflect.get(ctx.remote, 'gitPanel') as typeof ctx.remote.gitPanel | undefined
     if (panel === undefined) return null
