@@ -55,6 +55,9 @@
     },
     {
       "path": "../ui-context-menu"
+    },
+    {
+      "path": "../../api/session-controller/tsconfig.client.json"
     }
   ]
 }

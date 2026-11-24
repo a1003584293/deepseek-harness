@@ -37,10 +37,10 @@ Project Config schemas into forms and own optional instance-level UI policy.
  */
 configure(presentation: { auto?: boolean }, owner: Fiber = this.ctx.fiber): () => void
 
-/** Locate the profile patch for native editing.
- * @returns The existing profile patch path.
+/** Locate the profile patch, creating a valid empty patch on first use.
+ * @returns The profile patch path.
  */
-prepareDocument(): Promise<string>
+async prepareDocument(): Promise<string>
 
 /** Read active plugin schemas and their live values.
  * @param options Redaction required for remote callers.
@@ -120,10 +120,21 @@ Host service backing the generated `ctx.remote.settings` namespace. Every remote
 @Remote async mutate( ns: string, ops: SettingsPathOpView[], expectedRevision: number | undefined, ): Promise<SettingsNamespaceView>
 
 /**
- * Materialize the provider-owned settings document and open it in a native text editor.
- * @param signal - caller lifetime; abort terminates preparation or the native command.
- * @returns confirmation after the native opener accepts the document.
- * @throws RemoteError when no document exists, preparation fails, or opening fails.
+ * Materialize the provider-owned settings document and return its absolute path.
+ *
+ * The browser opens the path in its own editor; unlike
+ * `openSettingsDocument` this never launches a native application.
+ * @param signal - caller lifetime; abort terminates preparation.
+ * @returns the absolute document path.
+ * @throws RemoteError when no document exists or preparation fails.
+ */
+@Remote async prepareSettingsDocument(signal: AbortSignal): Promise<SettingsDocumentPrepareValue>
+
+/**
+ * Open the Session's settings document in the desktop's text editor.
+ * @param signal - caller lifetime; abort terminates preparation or opening.
+ * @returns whether the document opened.
+ * @throws RemoteError when no document exists, preparation fails, or the desktop refuses the path.
  */
 @Remote async openSettingsDocument(signal: AbortSignal): Promise<SettingsDocumentOpenValue>
 ```
