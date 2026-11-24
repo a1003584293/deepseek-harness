@@ -11,6 +11,7 @@ it('accepts props supplied by existing composer bar registrations', () => {
 
   const children = {
     'conversation.composer.dock': { kind: 'list', scope: 'session' },
+    'conversation.composer.facts': { kind: 'single', scope: 'session' },
     'conversation.input.activity': { kind: 'single', scope: 'session' },
     'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' },
     'conversation.input.left': { kind: 'list', scope: 'session' },
